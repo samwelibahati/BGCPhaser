@@ -26,10 +26,7 @@ def transport_urls(value: str) -> list[tuple[str, str]]:
         hostpath = raw[len("ftp://"):]
     else:
         hostpath = raw
-    return [
-        ("https", "https://" + hostpath),
-        ("ftp", "ftp://" + hostpath),
-    ]
+    return [("https", "https://" + hostpath), ("ftp", "ftp://" + hostpath)]
 
 
 def md5sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -55,7 +52,7 @@ def sha256sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
 
 
 def download_once(url: str, temporary: Path) -> dict[str, str]:
-    headers = {"User-Agent": "BGCPhaser-validation-download/1.1"}
+    headers = {"User-Agent": "BGCPhaser-validation-download/1.2"}
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=180) as response:
         final_url = response.geturl()
@@ -77,7 +74,7 @@ def validated_download(
     destination: Path,
     expected_md5: str,
     expected_size: int | None,
-    retries: int = 2,
+    retries: int = 5,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
     diagnostics: list[dict[str, str]] = []
 
@@ -138,13 +135,17 @@ def validated_download(
                     meta["result"] = "SIZE_MISMATCH"
                     diagnostics.append(meta)
                     temporary.unlink(missing_ok=True)
-                    break
+                    if attempt < retries:
+                        time.sleep(5 * attempt)
+                    continue
 
                 if observed_md5.lower() != expected_md5.lower():
                     meta["result"] = "MD5_MISMATCH"
                     diagnostics.append(meta)
                     temporary.unlink(missing_ok=True)
-                    break
+                    if attempt < retries:
+                        time.sleep(5 * attempt)
+                    continue
 
                 temporary.replace(destination)
                 meta["result"] = "VERIFIED"
@@ -171,31 +172,21 @@ def validated_download(
                     time.sleep(5 * attempt)
 
     detail = "; ".join(
-        f"{d['transport']}:{d['result']}:bytes={d['observed_bytes'] or 'NA'}:"
-        f"md5={d['observed_md5'] or 'NA'}"
+        f"{d['transport']}:{d['attempt']}:{d['result']}:"
+        f"bytes={d['observed_bytes'] or 'NA'}:md5={d['observed_md5'] or 'NA'}"
         for d in diagnostics
     )
-    raise RuntimeError(f"No ENA transport produced a verified file for {destination.name}: {detail}")
+    raise RuntimeError(
+        f"No ENA transport produced a verified file for {destination.name}: {detail}"
+    )
 
 
 def write_diagnostics(path: Path, rows: list[dict[str, str]]) -> None:
     fields = [
-        "run_accession",
-        "mate_index",
-        "filename",
-        "transport",
-        "requested_url",
-        "attempt",
-        "final_url",
-        "http_status",
-        "content_type",
-        "content_length",
-        "observed_bytes",
-        "expected_bytes",
-        "observed_md5",
-        "expected_md5",
-        "result",
-        "error",
+        "run_accession", "mate_index", "filename", "transport", "requested_url",
+        "attempt", "final_url", "http_status", "content_type", "content_length",
+        "observed_bytes", "expected_bytes", "observed_md5", "expected_md5",
+        "result", "error",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
@@ -207,7 +198,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Download exactly one paired-end ENA run and verify ENA byte counts "
-            "and MD5 checksums. HTTPS is attempted first, followed by FTP if needed."
+            "and MD5 checksums. HTTPS is attempted first, followed by FTP."
         )
     )
     parser.add_argument("--ena-tsv", required=True, type=Path)
@@ -223,9 +214,7 @@ def main() -> int:
         rows = [row for row in reader if row.get("run_accession", "").strip() == args.run]
 
     if len(rows) != 1:
-        raise SystemExit(
-            f"Expected exactly one ENA row for {args.run}; observed {len(rows)}"
-        )
+        raise SystemExit(f"Expected exactly one ENA row for {args.run}; observed {len(rows)}")
 
     row = rows[0]
     required_values = {
@@ -245,17 +234,11 @@ def main() -> int:
     sizes = split_field(row.get("fastq_bytes", ""))
 
     if len(urls) != 2:
-        raise SystemExit(
-            f"{args.run}: expected exactly two FASTQ files for paired data; observed {len(urls)}"
-        )
+        raise SystemExit(f"{args.run}: expected exactly two FASTQ files; observed {len(urls)}")
     if len(md5s) != len(urls):
-        raise SystemExit(
-            f"{args.run}: FASTQ URL/MD5 cardinality mismatch: {len(urls)} vs {len(md5s)}"
-        )
+        raise SystemExit(f"{args.run}: FASTQ URL/MD5 cardinality mismatch")
     if sizes and len(sizes) != len(urls):
-        raise SystemExit(
-            f"{args.run}: FASTQ URL/size cardinality mismatch: {len(urls)} vs {len(sizes)}"
-        )
+        raise SystemExit(f"{args.run}: FASTQ URL/size cardinality mismatch")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     provenance = args.output_dir / "provenance.tsv"
@@ -283,10 +266,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             verified, attempts = validated_download(
-                raw_url=raw_url,
-                destination=destination,
-                expected_md5=expected_md5,
-                expected_size=expected_size,
+                raw_url, destination, expected_md5, expected_size
             )
             for attempt in attempts:
                 diagnostic_rows.append(
@@ -323,19 +303,10 @@ def main() -> int:
         raise SystemExit(str(exc)) from exc
 
     write_diagnostics(diagnostic_path, diagnostic_rows)
-
     fields = [
-        "run_accession",
-        "mate_index",
-        "filename",
-        "transport",
-        "ena_url",
-        "final_url",
-        "ena_md5",
-        "observed_md5",
-        "expected_bytes",
-        "observed_bytes",
-        "sha256",
+        "run_accession", "mate_index", "filename", "transport", "ena_url",
+        "final_url", "ena_md5", "observed_md5", "expected_bytes",
+        "observed_bytes", "sha256",
     ]
     with provenance.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
