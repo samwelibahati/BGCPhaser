@@ -6,8 +6,10 @@ authors:
   - family-names: Bahati
     given-names: Samweli Y.
 version: 0.1.0
+doi: "10.5281/zenodo.22079283"
 date-released: 2026-08-24
 repository-code: "https://github.com/samwelibahati/BGCPhaser"
+url: "https://doi.org/10.5281/zenodo.22079283"
 license: MIT
 keywords:
   - biosynthetic gene clusters
