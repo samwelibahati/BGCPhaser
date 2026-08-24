@@ -34,9 +34,17 @@ The following quantities remain unchanged:
 - minimum query coverage: 95%;
 - minimum nucleotide identity: 98%.
 
-For graph-walk localization, canonical GFA segment sequences are spelled along the oriented assembler path records in `contigs.paths` and `scaffolds.paths`. Consecutive states must correspond to a directed GFA link, and GFA overlap CIGARs are applied when spelling the path sequence. Identical oriented assembler paths are deduplicated before mapping.
+For graph-walk localization, canonical GFA segment sequences are spelled along oriented assembler path records in `contigs.paths` and `scaffolds.paths`. Consecutive states can be spelled together only when the selected directed GFA graph contains the corresponding `L`-edge transition; the recorded GFA overlap CIGAR is applied during spelling. Identical oriented graph walks are deduplicated before mapping.
 
-Each 250-nt reference anchor is aligned to these spelled assembler-path sequences. Qualifying alignments may span one or more linked oriented GFA states. Equivalent alignments arising from overlapping contig/scaffold path records or reverse-complement path representations are collapsed to the same physical graph-walk localization using the reference-forward oriented state subpath and its boundary-state offsets.
+### A1.1 handling of SPAdes gapped path records
+
+During development-sentinel execution, an assembler path contained the transition `1705+ -> 125059+`, which was absent from the directed `L`-edge graph represented by `assembly_graph_with_scaffolds.gfa`. This occurred before minimap2 anchor mapping and therefore produced no G5 biological outcome.
+
+Assembler path records can contain scaffold jumps or other path-level adjacency that is not a sequence-spellable directed `L` edge. Such a transition is not used to infer nucleotide sequence and is not introduced into the BGCPhaser graph. Each assembler path record is instead split at every adjacent-state transition absent from the directed `L` graph. The resulting maximal contiguous directed graph-walk chunks are retained, single-state chunks included, and exact duplicate oriented chunks are deduplicated before sequence spelling and anchor mapping. No unknown bases, arbitrary gap sequence, or synthetic graph edge is inserted across a split.
+
+This A1.1 rule is a format/topology implementation clarification and applies uniformly to all subsequent graph-walk G5 analyses, beginning before the first post-amendment primary system VAL0002.
+
+Each 250-nt reference anchor is aligned to the spelled contiguous graph-walk sequences. Qualifying alignments may span one or more linked oriented GFA states. Equivalent alignments arising from overlapping contig/scaffold path records or reverse-complement path representations are collapsed to the same physical graph-walk localization using the reference-forward oriented state subpath and its boundary-state offsets.
 
 Exactly one qualifying physical graph-walk localization is required for the left anchor and exactly one for the right anchor. The unique reference-forward left-anchor walk defines the left boundary state, and the unique reference-forward right-anchor walk defines the right boundary state for G6. Zero or more than one physical localization for either anchor fails G5.
 
