@@ -24,5 +24,8 @@ external/
 validation_data/
 benchmarking/mibig_modular_pool.tsv
 benchmarking/ena_paired_wgs.tsv
+benchmarking/ena_paired_wgs_provenance_flagged.tsv
 benchmarking/ena_primary_run_shortlist.tsv
 benchmarking/ena_run_selection_summary.tsv
+benchmarking/val0002_provenance_candidates.tsv
+benchmarking/val0002_one_per_locus.tsv
