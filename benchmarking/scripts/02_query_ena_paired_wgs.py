@@ -14,16 +14,22 @@ ENA_ENDPOINT = "https://www.ebi.ac.uk/ena/portal/api/search"
 FIELDS = [
     "run_accession",
     "study_accession",
+    "study_title",
     "sample_accession",
     "secondary_sample_accession",
+    "sample_title",
+    "experiment_accession",
+    "experiment_title",
     "scientific_name",
     "tax_id",
+    "library_name",
     "library_strategy",
     "library_source",
     "library_selection",
     "library_layout",
     "instrument_platform",
     "instrument_model",
+    "first_public",
     "read_count",
     "base_count",
     "fastq_ftp",
@@ -44,7 +50,7 @@ def ena_search(tax_id: str) -> list[dict[str, str]]:
     url = ENA_ENDPOINT + "?" + urllib.parse.urlencode(params)
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "BGCPhaser-validation-discovery/1.0"},
+        headers={"User-Agent": "BGCPhaser-validation-discovery/1.1"},
     )
     with urllib.request.urlopen(request, timeout=120) as response:
         payload = json.load(response)
