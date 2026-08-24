@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bgcphaser"
+version = "0.1.0"
+description = "Chemistry-aware phasing of modular biosynthetic gene clusters from ambiguous assembly graphs"
+requires-python = ">=3.11"
+dependencies = [
+  "networkx>=3.2",
+  "pandas>=2.0",
+  "pydantic>=2.0",
+  "typer>=0.12",
+  "rich>=13.0",
+]
+
+[project.scripts]
+bgcphaser = "bgcphaser.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
