@@ -97,16 +97,26 @@ def write_anchors(
     return anchors
 
 
-def minimap2_version(executable: str) -> str:
+def resolve_executable(requested: str) -> Path:
+    found = shutil.which(requested)
+    if found is None:
+        raise SystemExit(f"Executable not found: {requested}")
+    path = Path(found).resolve()
+    if not path.is_file():
+        raise SystemExit(f"Resolved executable is not a file: {path}")
+    return path
+
+
+def minimap2_version(executable: Path) -> str:
     result = subprocess.run(
-        [executable, "--version"], check=True, capture_output=True, text=True
+        [str(executable), "--version"], check=True, capture_output=True, text=True
     )
     return result.stdout.strip() or result.stderr.strip()
 
 
-def run_minimap2(executable: str, target: Path, query: Path, paf: Path) -> None:
+def run_minimap2(executable: Path, target: Path, query: Path, paf: Path) -> None:
     command = [
-        executable,
+        str(executable),
         "-x", MINIMAP2_PRESET,
         "--secondary=yes",
         "-N", "100",
@@ -161,13 +171,16 @@ def main() -> int:
     parser.add_argument("--mibig-end", required=True, type=int, help="1-based exclusive")
     parser.add_argument("--benchmark-id", required=True)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--minimap2",
+        default="minimap2",
+        help="minimap2 executable name or explicit path; version 2.31 is required",
+    )
     args = parser.parse_args()
 
-    minimap2 = shutil.which("minimap2")
-    if minimap2 is None:
-        raise SystemExit("minimap2 not found in PATH")
+    minimap2 = resolve_executable(args.minimap2)
     version = minimap2_version(minimap2)
-    if version != "2.31-r1287" and not version.startswith("2.31"):
+    if not version.startswith("2.31"):
         raise SystemExit(f"Expected minimap2 2.31, observed {version}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -246,6 +259,8 @@ def main() -> int:
         ("reference_length", str(len(reference_sequence))),
         ("reference_sha256", sha256sum(args.reference_fasta)),
         ("gfa_sha256", sha256sum(args.gfa)),
+        ("minimap2_executable", str(minimap2)),
+        ("minimap2_sha256", sha256sum(minimap2)),
         ("minimap2_version", version),
         ("anchor_length", str(ANCHOR_LENGTH)),
         ("minimum_query_coverage", str(MIN_QUERY_COVERAGE)),
