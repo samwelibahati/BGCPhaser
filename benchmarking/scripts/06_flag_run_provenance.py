@@ -6,12 +6,46 @@ import csv
 import re
 from pathlib import Path
 
+# Conservative discovery-stage flags. A match sends a run to manual review;
+# it does not by itself exclude the run. Patterns target experimental contexts
+# that can make a sequenced genome differ intentionally from the curated MIBiG
+# reference strain or make the material unsuitable as ordinary isolate WGS.
 DERIVATIVE_PATTERNS = {
-    "MUTANT": r"\bmutant\b|\bmutation\b|\bknockout\b|\bknock-out\b|\bdeletion\b|\bdelta\b",
-    "TRANSFORMANT": r"\btransformant\b|\btransformation\b|\btransformed\b",
-    "ENGINEERED": r"\bengineered\b|\bgenetically modified\b|\brecombinant\b|\bsynthetic construct\b",
-    "EVOLVED": r"\badaptive evolution\b|\blaboratory evolution\b|\bevolved strain\b|\bALE\b",
-    "PASSAGED_OR_SELECTED": r"\bpassaged\b|\bserial passage\b|\bselected strain\b|\bselection experiment\b",
+    "MUTANT_OR_SUPPRESSOR": (
+        r"\bmutants?\b|\bmutation(?:al|s)?\b|\bknock[- ]?out\b|"
+        r"\bdeletion\b|\bdelta\b|\bsuppress(?:or|er)s?\b|\bsup\d*\b"
+    ),
+    "TRANSFORMANT_OR_ENGINEERED": (
+        r"\btransformants?\b|\btransformation\b|\btransformed\b|"
+        r"\bengineered\b|\bengineering\b|\bgenetically modified\b|"
+        r"\brecombinant\b|\bsynthetic construct\b|\bminibacillus\b"
+    ),
+    "EVOLUTION_OR_PASSAGING": (
+        r"\badaptive evolution\b|\blaboratory evolution\b|\bevolution experiment\b|"
+        r"\bevolved\b|\bserial passage\b|\bpassaged\b|\bwhole population\b|"
+        r"\bforeign DNA\b|\bgeneration\s*\d+\b|\bgen\s*\d+\b"
+    ),
+    "SELECTION_OR_RESISTANCE": (
+        r"\bselected strain\b|\bselection experiment\b|\bresistan(?:t|ce)\b|"
+        r"\bdrug[- ]selected\b|\bantibiotic[- ]selected\b"
+    ),
+    "IRRADIATION_OR_MUTAGENESIS": (
+        r"\birradiat(?:ed|ion)\b|\bgamma ray\b|\bion beam\b|\bmutagenesis\b|"
+        r"\bmock[- ]irradiated\b"
+    ),
+    "CRISPR_OR_REPORTER": (
+        r"\bcrispr(?:i)?\b|\breporter strain\b|\breporter\b"
+    ),
+    "PHAGE_OR_PROPHAGE_EXPERIMENT": (
+        r"\bprophages?\b|\btemperate phage\b|\bphage evolution\b|\blysogeny\b"
+    ),
+    "NONSTANDARD_CELL_DNA_SOURCE": (
+        r"\bmembrane vesicles?\b|\bvesicle DNA\b"
+    ),
+    "CONTROL_OR_PARENT_CONTEXT": (
+        r"\bancestor\b|\bparent strain\b|\bwild[- ]?type\b|\bWT background\b|"
+        r"\bmock[- ]treated\b"
+    ),
 }
 
 TEXT_FIELDS = [
@@ -38,8 +72,8 @@ def provenance_flags(row: dict[str, str]) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Flag ENA discovery runs whose study/sample/experiment metadata "
-            "suggests engineered, mutant, transformant, evolved or selected derivatives."
+            "Conservatively flag ENA discovery runs whose study/sample/experiment "
+            "metadata indicate experimental derivatives or nonstandard WGS contexts."
         )
     )
     parser.add_argument("--ena-tsv", required=True, type=Path)
