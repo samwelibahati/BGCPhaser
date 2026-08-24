@@ -111,7 +111,9 @@ The repository includes source code, automated tests, environment metadata and s
 
 ## Citation
 
-Citation metadata are provided in `CITATION.cff`. Please cite the archived software release DOI once available, together with the associated BGCPhaser manuscript when published.
+The archived BGCPhaser v0.1.0 software release is permanently available from Zenodo under DOI **10.5281/zenodo.22079283**. Citation metadata are provided in `CITATION.cff`.
+
+Please cite the archived software release together with the associated BGCPhaser manuscript when published.
 
 ## License
 
