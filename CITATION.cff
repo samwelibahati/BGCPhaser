@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: BGCPhaser
+message: "If you use BGCPhaser, please cite the software release and associated manuscript."
+type: software
+authors:
+  - family-names: Bahati
+    given-names: Samweli Y.
+version: 0.1.0
+date-released: 2026-08-24
+repository-code: "https://github.com/samwelibahati/BGCPhaser"
+license: MIT
+keywords:
+  - biosynthetic gene clusters
+  - assembly graphs
+  - NRPS
+  - polyketide synthase
+  - genome assembly
+  - bioinformatics
