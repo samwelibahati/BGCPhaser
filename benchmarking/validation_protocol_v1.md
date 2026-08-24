@@ -56,6 +56,8 @@ The locked read-processing and SPAdes workflow produces the canonical GFA and as
 
 Both predefined BGC endpoint anchors localize uniquely and orientation-consistently in the canonical short-read assembly graph.
 
+For primary expanded validation, the G5 anchor rule is frozen before any new validation endpoint is inspected. MIBiG locus coordinates are interpreted using the database convention of a 1-based inclusive start and a 1-based exclusive end. The left anchor is the first 250 nt inside the curated locus and the right anchor is the last 250 nt inside the curated locus, both extracted from the reference-forward sequence. Each anchor is aligned independently to the canonical SPAdes GFA segment sequences with minimap2 v2.31 using preset `asm5`. A qualifying anchor alignment must cover at least 95% of the 250-nt query and have at least 98% nucleotide identity. Exactly one qualifying physical graph-segment alignment is required for each anchor. The alignment strand defines the corresponding oriented graph state. If both anchors localize to the same physical segment, their oriented coordinates must be compatible with left-to-right traversal of the reference-forward locus. Failure to obtain exactly one qualifying localization for either anchor fails G5. Anchor length, thresholds, mapper preset, or rescue mappings are not altered in response to an individual system outcome.
+
 ### G6. Directed graph connectivity
 
 A directed anchor-to-anchor connection exists in the oriented assembly graph.
