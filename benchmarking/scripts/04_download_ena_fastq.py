@@ -7,6 +7,7 @@ import hashlib
 import shutil
 import sys
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -15,12 +16,20 @@ def split_field(value: str) -> list[str]:
     return [item.strip() for item in value.split(";") if item.strip()]
 
 
-def normalize_url(value: str) -> str:
-    if value.startswith("ftp://"):
-        return "https://" + value[len("ftp://"):]
-    if value.startswith("http://") or value.startswith("https://"):
-        return value
-    return "https://" + value
+def transport_urls(value: str) -> list[tuple[str, str]]:
+    raw = value.strip()
+    if raw.startswith("https://"):
+        hostpath = raw[len("https://"):]
+    elif raw.startswith("http://"):
+        hostpath = raw[len("http://"):]
+    elif raw.startswith("ftp://"):
+        hostpath = raw[len("ftp://"):]
+    else:
+        hostpath = raw
+    return [
+        ("https", "https://" + hostpath),
+        ("ftp", "ftp://" + hostpath),
+    ]
 
 
 def md5sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -45,36 +54,160 @@ def sha256sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
-def download(url: str, destination: Path, retries: int = 3) -> None:
-    temporary = destination.with_suffix(destination.suffix + ".part")
-    if temporary.exists():
-        temporary.unlink()
+def download_once(url: str, temporary: Path) -> dict[str, str]:
+    headers = {"User-Agent": "BGCPhaser-validation-download/1.1"}
+    request = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(request, timeout=180) as response:
+        final_url = response.geturl()
+        status = getattr(response, "status", "")
+        content_type = response.headers.get("Content-Type", "")
+        content_length = response.headers.get("Content-Length", "")
+        with temporary.open("wb") as handle:
+            shutil.copyfileobj(response, handle, length=1024 * 1024)
+    return {
+        "final_url": str(final_url),
+        "http_status": str(status),
+        "content_type": str(content_type),
+        "content_length": str(content_length),
+    }
 
-    headers = {"User-Agent": "BGCPhaser-validation-download/1.0"}
-    last_error: Exception | None = None
 
-    for attempt in range(1, retries + 1):
-        try:
-            request = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(request, timeout=120) as response:
-                with temporary.open("wb") as handle:
-                    shutil.copyfileobj(response, handle, length=1024 * 1024)
-            temporary.replace(destination)
-            return
-        except Exception as exc:
-            last_error = exc
+def validated_download(
+    raw_url: str,
+    destination: Path,
+    expected_md5: str,
+    expected_size: int | None,
+    retries: int = 2,
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    diagnostics: list[dict[str, str]] = []
+
+    if destination.exists():
+        observed_size = destination.stat().st_size
+        observed_md5 = md5sum(destination)
+        size_ok = expected_size is None or observed_size == expected_size
+        md5_ok = observed_md5.lower() == expected_md5.lower()
+        if size_ok and md5_ok:
+            return (
+                {
+                    "transport": "existing_verified",
+                    "requested_url": "",
+                    "final_url": "",
+                    "http_status": "",
+                    "content_type": "",
+                    "content_length": "",
+                    "observed_bytes": str(observed_size),
+                    "observed_md5": observed_md5,
+                },
+                diagnostics,
+            )
+        raise RuntimeError(
+            f"Existing file is invalid and will not be overwritten: {destination} "
+            f"(bytes={observed_size}, md5={observed_md5})"
+        )
+
+    for transport, url in transport_urls(raw_url):
+        for attempt in range(1, retries + 1):
+            temporary = destination.with_name(
+                destination.name + f".{transport}.attempt{attempt}.part"
+            )
             temporary.unlink(missing_ok=True)
-            if attempt < retries:
-                time.sleep(5 * attempt)
+            meta = {
+                "transport": transport,
+                "requested_url": url,
+                "attempt": str(attempt),
+                "final_url": "",
+                "http_status": "",
+                "content_type": "",
+                "content_length": "",
+                "observed_bytes": "",
+                "expected_bytes": "" if expected_size is None else str(expected_size),
+                "observed_md5": "",
+                "expected_md5": expected_md5,
+                "result": "",
+                "error": "",
+            }
+            try:
+                response_meta = download_once(url, temporary)
+                meta.update(response_meta)
+                observed_size = temporary.stat().st_size
+                observed_md5 = md5sum(temporary)
+                meta["observed_bytes"] = str(observed_size)
+                meta["observed_md5"] = observed_md5
 
-    raise RuntimeError(f"Download failed after {retries} attempts: {url}: {last_error}")
+                if expected_size is not None and observed_size != expected_size:
+                    meta["result"] = "SIZE_MISMATCH"
+                    diagnostics.append(meta)
+                    temporary.unlink(missing_ok=True)
+                    break
+
+                if observed_md5.lower() != expected_md5.lower():
+                    meta["result"] = "MD5_MISMATCH"
+                    diagnostics.append(meta)
+                    temporary.unlink(missing_ok=True)
+                    break
+
+                temporary.replace(destination)
+                meta["result"] = "VERIFIED"
+                diagnostics.append(meta)
+                return (
+                    {
+                        "transport": transport,
+                        "requested_url": url,
+                        "final_url": meta["final_url"],
+                        "http_status": meta["http_status"],
+                        "content_type": meta["content_type"],
+                        "content_length": meta["content_length"],
+                        "observed_bytes": str(observed_size),
+                        "observed_md5": observed_md5,
+                    },
+                    diagnostics,
+                )
+            except Exception as exc:
+                meta["result"] = "TRANSFER_ERROR"
+                meta["error"] = repr(exc)
+                diagnostics.append(meta)
+                temporary.unlink(missing_ok=True)
+                if attempt < retries:
+                    time.sleep(5 * attempt)
+
+    detail = "; ".join(
+        f"{d['transport']}:{d['result']}:bytes={d['observed_bytes'] or 'NA'}:"
+        f"md5={d['observed_md5'] or 'NA'}"
+        for d in diagnostics
+    )
+    raise RuntimeError(f"No ENA transport produced a verified file for {destination.name}: {detail}")
+
+
+def write_diagnostics(path: Path, rows: list[dict[str, str]]) -> None:
+    fields = [
+        "run_accession",
+        "mate_index",
+        "filename",
+        "transport",
+        "requested_url",
+        "attempt",
+        "final_url",
+        "http_status",
+        "content_type",
+        "content_length",
+        "observed_bytes",
+        "expected_bytes",
+        "observed_md5",
+        "expected_md5",
+        "result",
+        "error",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Download exactly one paired-end ENA run from the TSV produced by "
-            "02_query_ena_paired_wgs.py and verify ENA MD5 checksums."
+            "Download exactly one paired-end ENA run and verify ENA byte counts "
+            "and MD5 checksums. HTTPS is attempted first, followed by FTP if needed."
         )
     )
     parser.add_argument("--ena-tsv", required=True, type=Path)
@@ -83,9 +216,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.ena_tsv.is_file():
-        raise SystemExit(f"ENA TSV absent: {args.ena_tsv}")
-    if args.output_dir.exists():
-        raise SystemExit(f"Output directory already exists: {args.output_dir}")
+        raise SystemExit(f"ENA TSV absent: {args.ena_ts v}")
 
     with args.ena_tsv.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -126,58 +257,84 @@ def main() -> int:
             f"{args.run}: FASTQ URL/size cardinality mismatch: {len(urls)} vs {len(sizes)}"
         )
 
-    args.output_dir.mkdir(parents=True)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
     provenance = args.output_dir / "provenance.tsv"
-    manifest_rows = []
+    diagnostic_path = args.output_dir / "download_diagnostics.tsv"
+    if provenance.exists():
+        raise SystemExit(f"Verified provenance already exists: {provenance}")
 
-    for index, (raw_url, expected_md5) in enumerate(zip(urls, md5s), start=1):
-        url = normalize_url(raw_url)
-        filename = Path(urllib.request.urlparse(url).path).name
-        if not filename:
-            raise SystemExit(f"Cannot derive filename from ENA URL: {url}")
-        destination = args.output_dir / filename
-        print(f"Downloading {args.run} mate {index}: {url}", file=sys.stderr)
-        download(url, destination)
+    manifest_rows: list[dict[str, str]] = []
+    diagnostic_rows: list[dict[str, str]] = []
 
-        observed_md5 = md5sum(destination)
-        if observed_md5.lower() != expected_md5.lower():
-            destination.unlink(missing_ok=True)
-            raise SystemExit(
-                f"MD5 mismatch for {filename}: expected {expected_md5}, observed {observed_md5}"
+    try:
+        for index, (raw_url, expected_md5) in enumerate(zip(urls, md5s), start=1):
+            parsed = urllib.parse.urlparse(
+                raw_url if "://" in raw_url else "https://" + raw_url
             )
+            filename = Path(parsed.path).name
+            if not filename:
+                raise RuntimeError(f"Cannot derive filename from ENA URL: {raw_url}")
+            destination = args.output_dir / filename
+            expected_size = int(sizes[index - 1]) if sizes else None
 
-        if sizes:
-            expected_size = int(sizes[index - 1])
-            observed_size = destination.stat().st_size
-            if observed_size != expected_size:
-                destination.unlink(missing_ok=True)
-                raise SystemExit(
-                    f"Size mismatch for {filename}: expected {expected_size}, observed {observed_size}"
+            print(
+                f"Downloading {args.run} mate {index}; expected bytes={expected_size or 'NA'}; "
+                f"expected md5={expected_md5}",
+                file=sys.stderr,
+            )
+            verified, attempts = validated_download(
+                raw_url=raw_url,
+                destination=destination,
+                expected_md5=expected_md5,
+                expected_size=expected_size,
+            )
+            for attempt in attempts:
+                diagnostic_rows.append(
+                    {
+                        "run_accession": args.run,
+                        "mate_index": str(index),
+                        "filename": filename,
+                        **attempt,
+                    }
                 )
-        else:
-            observed_size = destination.stat().st_size
+            print(
+                f"Verified {filename} via {verified['transport']}: "
+                f"bytes={verified['observed_bytes']} md5={verified['observed_md5']}",
+                file=sys.stderr,
+            )
+            manifest_rows.append(
+                {
+                    "run_accession": args.run,
+                    "mate_index": str(index),
+                    "filename": filename,
+                    "transport": verified["transport"],
+                    "ena_url": verified["requested_url"],
+                    "final_url": verified["final_url"],
+                    "ena_md5": expected_md5,
+                    "observed_md5": verified["observed_md5"],
+                    "expected_bytes": "" if expected_size is None else str(expected_size),
+                    "observed_bytes": verified["observed_bytes"],
+                    "sha256": sha256sum(destination),
+                }
+            )
+    except Exception as exc:
+        if diagnostic_rows:
+            write_diagnostics(diagnostic_path, diagnostic_rows)
+        raise SystemExit(str(exc)) from exc
 
-        manifest_rows.append(
-            {
-                "run_accession": args.run,
-                "mate_index": str(index),
-                "filename": filename,
-                "ena_url": url,
-                "ena_md5": expected_md5,
-                "observed_md5": observed_md5,
-                "bytes": str(observed_size),
-                "sha256": sha256sum(destination),
-            }
-        )
+    write_diagnostics(diagnostic_path, diagnostic_rows)
 
     fields = [
         "run_accession",
         "mate_index",
         "filename",
+        "transport",
         "ena_url",
+        "final_url",
         "ena_md5",
         "observed_md5",
-        "bytes",
+        "expected_bytes",
+        "observed_bytes",
         "sha256",
     ]
     with provenance.open("w", encoding="utf-8", newline="") as handle:
@@ -187,6 +344,7 @@ def main() -> int:
 
     print(f"Verified {len(manifest_rows)} FASTQ files for {args.run}")
     print(provenance)
+    print(diagnostic_path)
     return 0
 
 
