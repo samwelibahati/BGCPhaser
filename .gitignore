@@ -18,3 +18,11 @@ env/
 *.tmp
 *.staging/
 bgcphaser_results/
+
+# Expanded-validation generated and external data
+external/
+validation_data/
+benchmarking/mibig_modular_pool.tsv
+benchmarking/ena_paired_wgs.tsv
+benchmarking/ena_primary_run_shortlist.tsv
+benchmarking/ena_run_selection_summary.tsv
