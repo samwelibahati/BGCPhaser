@@ -33,6 +33,15 @@ if ! command -v spades.py >/dev/null 2>&1; then
     exit 2
 fi
 
+if command -v sha256sum >/dev/null 2>&1; then
+    SHA256_CMD=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+    SHA256_CMD=(shasum -a 256)
+else
+    echo "Neither sha256sum nor shasum is available" >&2
+    exit 2
+fi
+
 FASTP_VERSION=$(fastp --version 2>&1 | head -n 1)
 SPADES_VERSION=$(spades.py --version 2>&1 | head -n 1)
 
@@ -52,9 +61,10 @@ fi
 
 mkdir -p "$OUTDIR/raw_checksums" "$OUTDIR/reads" "$OUTDIR/logs"
 
-sha256sum "$RAW_R1" "$RAW_R2" > "$OUTDIR/raw_checksums/raw_fastq.sha256"
+"${SHA256_CMD[@]}" "$RAW_R1" "$RAW_R2" > "$OUTDIR/raw_checksums/raw_fastq.sha256"
 printf '%s\n' "$FASTP_VERSION" > "$OUTDIR/logs/fastp.version.txt"
 printf '%s\n' "$SPADES_VERSION" > "$OUTDIR/logs/spades.version.txt"
+printf '%s\n' "${SHA256_CMD[*]}" > "$OUTDIR/logs/sha256.command.txt"
 
 CLEAN_R1="$OUTDIR/reads/clean_R1.fastq.gz"
 CLEAN_R2="$OUTDIR/reads/clean_R2.fastq.gz"
@@ -80,7 +90,7 @@ fastp \
   --html "$OUTDIR/fastp.html" \
   2> "$OUTDIR/logs/fastp.stderr.log"
 
-sha256sum \
+"${SHA256_CMD[@]}" \
   "$CLEAN_R1" "$CLEAN_R2" \
   "$UNPAIRED_R1" "$UNPAIRED_R2" \
   > "$OUTDIR/reads/processed_fastq.sha256"
@@ -111,6 +121,6 @@ for path in "${REQUIRED[@]}"; do
     fi
 done
 
-sha256sum "${REQUIRED[@]}" > "$OUTDIR/spades/canonical_outputs.sha256"
+"${SHA256_CMD[@]}" "${REQUIRED[@]}" > "$OUTDIR/spades/canonical_outputs.sha256"
 
 echo "G4 assembly workflow complete: $OUTDIR"
