@@ -216,7 +216,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.ena_tsv.is_file():
-        raise SystemExit(f"ENA TSV absent: {args.ena_ts v}")
+        raise SystemExit(f"ENA TSV absent: {args.ena_tsv}")
 
     with args.ena_tsv.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
