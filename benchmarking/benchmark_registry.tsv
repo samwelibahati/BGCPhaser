@@ -1,0 +1,8 @@
+benchmark_id	mibig_accession	bgc_class	organism	reference_accession	assembly_accession	biosample_accession	sra_run	read_layout	is_prior_system	primary_validation_eligible	gate_reached	failure_reason	candidate_count	truth_in_candidate_population	truth_rank	notes
+BGRR0055	BGC0002072	T1PKS	Streptomyces sp. Mg1	CP011664.1	GCF_000412265.2	SAMN02471086	SRR2062531	PAIRED	YES	NO	PRIOR_SYSTEM	Development/principal benchmark from initial study	2584	YES	31	Excluded from primary independent-validation estimates
+BGRR0074	BGC0002068	NRPS	Labrenzia sp. PHM005	CP041191.1	GCF_006517275.1	SAMN12092007	SRR9611265	PAIRED	YES	NO	PRIOR_SYSTEM	Nonambiguous short-read control and reproducibility regression	1	YES	1	Excluded from primary independent-validation estimates
+BGRR0091	BGC0000320	NRPS	Bacillus cereus				SRR35544090	ONT	YES	NO	PRIOR_SYSTEM	Nonambiguous long-read control	1	YES	NA	Final reference/assembly/BioSample provenance requires reconciliation before publication metadata are reused
+BGRR0079	BGC0002124	T1PKS	Actinomadura verrucosospora NRRL:B18236				SRR11741624	MATE1_ONLY	YES	NO	G3	Incomplete paired-end provenance	NA	NA	NA	Prior prospective screen
+BGRR0057	BGC0001056	NRPS-T1PKS hybrid	Serratia plymuthica RVH1				SRR3925615	PAIRED	YES	NO	G7	BGC resolved within a single graph segment	1	NA	NA	Prior prospective screen
+BGRR0081	BGC0000921	NRPS	Pseudomonas putida RW10S1				SRR14766874	PAIRED	YES	NO	G7	Only one assembler-bounded candidate	1	NA	NA	Prior prospective screen
+BGRR0076	BGC0002082	NRPS	Stappia indica				SRR10686571	PAIRED	YES	NO	G6	Validated anchors in disconnected graph components	0	NA	NA	Prior prospective screen
