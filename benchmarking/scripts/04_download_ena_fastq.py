@@ -5,11 +5,14 @@ import argparse
 import csv
 import hashlib
 import shutil
+import subprocess
 import sys
 import time
 import urllib.parse
-import urllib.request
 from pathlib import Path
+
+DOWNLOAD_PROTOCOL_VERSION = "1.3-resumable-curl"
+DEFAULT_ATTEMPTS_PER_TRANSPORT = 20
 
 
 def split_field(value: str) -> list[str]:
@@ -29,164 +32,226 @@ def transport_urls(value: str) -> list[tuple[str, str]]:
     return [("https", "https://" + hostpath), ("ftp", "ftp://" + hostpath)]
 
 
-def md5sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
+def md5sum(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
     digest = hashlib.md5()
     with path.open("rb") as handle:
-        while True:
-            chunk = handle.read(chunk_size)
-            if not chunk:
-                break
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def sha256sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
+def sha256sum(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
-        while True:
-            chunk = handle.read(chunk_size)
-            if not chunk:
-                break
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def download_once(url: str, temporary: Path) -> dict[str, str]:
-    headers = {"User-Agent": "BGCPhaser-validation-download/1.2"}
-    request = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(request, timeout=180) as response:
-        final_url = response.geturl()
-        status = getattr(response, "status", "")
-        content_type = response.headers.get("Content-Type", "")
-        content_length = response.headers.get("Content-Length", "")
-        with temporary.open("wb") as handle:
-            shutil.copyfileobj(response, handle, length=1024 * 1024)
+def resolve_curl(requested: str) -> Path:
+    found = shutil.which(requested)
+    if found is None:
+        raise SystemExit(f"curl executable not found: {requested}")
+    path = Path(found).resolve()
+    if not path.is_file():
+        raise SystemExit(f"Resolved curl executable is not a file: {path}")
+    return path
+
+
+def curl_version(executable: Path) -> str:
+    result = subprocess.run(
+        [str(executable), "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    first = (result.stdout or result.stderr).splitlines()
+    return first[0].strip() if first else "UNKNOWN"
+
+
+def curl_transfer(
+    executable: Path,
+    url: str,
+    partial: Path,
+    resume_from: int,
+) -> subprocess.CompletedProcess[str]:
+    command = [
+        str(executable),
+        "--location",
+        "--fail",
+        "--show-error",
+        "--progress-bar",
+        "--connect-timeout",
+        "30",
+        "--speed-limit",
+        "1024",
+        "--speed-time",
+        "120",
+        "--user-agent",
+        "BGCPhaser-validation-download/1.3",
+    ]
+    if resume_from > 0:
+        command.extend(["--continue-at", "-"])
+    command.extend(["--output", str(partial), url])
+    return subprocess.run(command, text=True)
+
+
+def verified_existing(
+    destination: Path,
+    expected_md5: str,
+    expected_size: int | None,
+) -> dict[str, str] | None:
+    if not destination.exists():
+        return None
+    observed_size = destination.stat().st_size
+    if expected_size is not None and observed_size != expected_size:
+        raise RuntimeError(
+            f"Existing final file has wrong size and will not be overwritten: {destination} "
+            f"(bytes={observed_size}, expected={expected_size})"
+        )
+    observed_md5 = md5sum(destination)
+    if observed_md5.lower() != expected_md5.lower():
+        raise RuntimeError(
+            f"Existing final file has wrong MD5 and will not be overwritten: {destination} "
+            f"(md5={observed_md5}, expected={expected_md5})"
+        )
     return {
-        "final_url": str(final_url),
-        "http_status": str(status),
-        "content_type": str(content_type),
-        "content_length": str(content_length),
+        "transport": "existing_verified",
+        "requested_url": "",
+        "observed_bytes": str(observed_size),
+        "observed_md5": observed_md5,
     }
 
 
-def validated_download(
+def validated_resumable_download(
     raw_url: str,
     destination: Path,
     expected_md5: str,
     expected_size: int | None,
-    retries: int = 5,
+    curl: Path,
+    attempts_per_transport: int,
 ) -> tuple[dict[str, str], list[dict[str, str]]]:
     diagnostics: list[dict[str, str]] = []
 
-    if destination.exists():
-        observed_size = destination.stat().st_size
-        observed_md5 = md5sum(destination)
-        size_ok = expected_size is None or observed_size == expected_size
-        md5_ok = observed_md5.lower() == expected_md5.lower()
-        if size_ok and md5_ok:
-            return (
-                {
-                    "transport": "existing_verified",
-                    "requested_url": "",
-                    "final_url": "",
-                    "http_status": "",
-                    "content_type": "",
-                    "content_length": "",
-                    "observed_bytes": str(observed_size),
-                    "observed_md5": observed_md5,
-                },
-                diagnostics,
-            )
+    existing = verified_existing(destination, expected_md5, expected_size)
+    if existing is not None:
+        return existing, diagnostics
+
+    partial = destination.with_name(destination.name + ".part")
+    if partial.exists() and expected_size is not None and partial.stat().st_size > expected_size:
         raise RuntimeError(
-            f"Existing file is invalid and will not be overwritten: {destination} "
-            f"(bytes={observed_size}, md5={observed_md5})"
+            f"Partial file is larger than ENA expected size; refusing to resume: {partial} "
+            f"({partial.stat().st_size} > {expected_size})"
         )
 
     for transport, url in transport_urls(raw_url):
-        for attempt in range(1, retries + 1):
-            temporary = destination.with_name(
-                destination.name + f".{transport}.attempt{attempt}.part"
-            )
-            temporary.unlink(missing_ok=True)
+        for attempt in range(1, attempts_per_transport + 1):
+            resume_from = partial.stat().st_size if partial.exists() else 0
             meta = {
                 "transport": transport,
                 "requested_url": url,
                 "attempt": str(attempt),
-                "final_url": "",
-                "http_status": "",
-                "content_type": "",
-                "content_length": "",
-                "observed_bytes": "",
+                "resume_from_bytes": str(resume_from),
+                "curl_exit_code": "",
+                "observed_bytes": str(resume_from),
                 "expected_bytes": "" if expected_size is None else str(expected_size),
                 "observed_md5": "",
                 "expected_md5": expected_md5,
                 "result": "",
                 "error": "",
             }
+
+            print(
+                f"[{destination.name}] {transport} attempt {attempt}/{attempts_per_transport}; "
+                f"resume_from={resume_from} bytes",
+                file=sys.stderr,
+            )
             try:
-                response_meta = download_once(url, temporary)
-                meta.update(response_meta)
-                observed_size = temporary.stat().st_size
-                observed_md5 = md5sum(temporary)
-                meta["observed_bytes"] = str(observed_size)
-                meta["observed_md5"] = observed_md5
-
-                if expected_size is not None and observed_size != expected_size:
-                    meta["result"] = "SIZE_MISMATCH"
-                    diagnostics.append(meta)
-                    temporary.unlink(missing_ok=True)
-                    if attempt < retries:
-                        time.sleep(5 * attempt)
-                    continue
-
-                if observed_md5.lower() != expected_md5.lower():
-                    meta["result"] = "MD5_MISMATCH"
-                    diagnostics.append(meta)
-                    temporary.unlink(missing_ok=True)
-                    if attempt < retries:
-                        time.sleep(5 * attempt)
-                    continue
-
-                temporary.replace(destination)
-                meta["result"] = "VERIFIED"
-                diagnostics.append(meta)
-                return (
-                    {
-                        "transport": transport,
-                        "requested_url": url,
-                        "final_url": meta["final_url"],
-                        "http_status": meta["http_status"],
-                        "content_type": meta["content_type"],
-                        "content_length": meta["content_length"],
-                        "observed_bytes": str(observed_size),
-                        "observed_md5": observed_md5,
-                    },
-                    diagnostics,
-                )
+                result = curl_transfer(curl, url, partial, resume_from)
             except Exception as exc:
-                meta["result"] = "TRANSFER_ERROR"
+                meta["result"] = "CURL_INVOCATION_ERROR"
                 meta["error"] = repr(exc)
                 diagnostics.append(meta)
-                temporary.unlink(missing_ok=True)
-                if attempt < retries:
-                    time.sleep(5 * attempt)
+                time.sleep(min(30, 3 * attempt))
+                continue
+
+            meta["curl_exit_code"] = str(result.returncode)
+            observed_size = partial.stat().st_size if partial.exists() else 0
+            meta["observed_bytes"] = str(observed_size)
+
+            if expected_size is not None and observed_size > expected_size:
+                meta["result"] = "OVERSIZE_PARTIAL"
+                diagnostics.append(meta)
+                raise RuntimeError(
+                    f"Resumable download exceeded ENA expected size for {destination.name}: "
+                    f"observed={observed_size}, expected={expected_size}. Partial retained at {partial}."
+                )
+
+            if result.returncode != 0:
+                meta["result"] = "TRANSFER_INTERRUPTED_RETAINED"
+                meta["error"] = f"curl_exit_code={result.returncode}"
+                diagnostics.append(meta)
+                # The partial file is intentionally retained. The next attempt
+                # resumes from its current byte offset instead of starting over.
+                time.sleep(min(30, 3 * attempt))
+                continue
+
+            if expected_size is not None and observed_size < expected_size:
+                meta["result"] = "INCOMPLETE_TRANSFER_RETAINED"
+                diagnostics.append(meta)
+                time.sleep(min(30, 3 * attempt))
+                continue
+
+            observed_md5 = md5sum(partial)
+            meta["observed_md5"] = observed_md5
+            if observed_md5.lower() != expected_md5.lower():
+                meta["result"] = "FULL_SIZE_MD5_MISMATCH"
+                diagnostics.append(meta)
+                raise RuntimeError(
+                    f"Full-size file failed ENA MD5 for {destination.name}; partial retained for audit: "
+                    f"observed={observed_md5}, expected={expected_md5}"
+                )
+
+            partial.replace(destination)
+            meta["result"] = "VERIFIED"
+            diagnostics.append(meta)
+            return (
+                {
+                    "transport": f"curl_{transport}_resumable",
+                    "requested_url": url,
+                    "observed_bytes": str(observed_size),
+                    "observed_md5": observed_md5,
+                },
+                diagnostics,
+            )
 
     detail = "; ".join(
         f"{d['transport']}:{d['attempt']}:{d['result']}:"
-        f"bytes={d['observed_bytes'] or 'NA'}:md5={d['observed_md5'] or 'NA'}"
-        for d in diagnostics
+        f"resume={d['resume_from_bytes']}:bytes={d['observed_bytes']}:curl={d['curl_exit_code'] or 'NA'}"
+        for d in diagnostics[-10:]
     )
     raise RuntimeError(
-        f"No ENA transport produced a verified file for {destination.name}: {detail}"
+        f"Resumable ENA download did not complete for {destination.name}. "
+        f"Partial retained at {partial}. Last attempts: {detail}"
     )
 
 
 def write_diagnostics(path: Path, rows: list[dict[str, str]]) -> None:
     fields = [
-        "run_accession", "mate_index", "filename", "transport", "requested_url",
-        "attempt", "final_url", "http_status", "content_type", "content_length",
-        "observed_bytes", "expected_bytes", "observed_md5", "expected_md5",
-        "result", "error",
+        "run_accession",
+        "mate_index",
+        "filename",
+        "transport",
+        "requested_url",
+        "attempt",
+        "resume_from_bytes",
+        "curl_exit_code",
+        "observed_bytes",
+        "expected_bytes",
+        "observed_md5",
+        "expected_md5",
+        "result",
+        "error",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
@@ -194,20 +259,47 @@ def write_diagnostics(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def preserve_prior_diagnostics(path: Path) -> Path | None:
+    if not path.exists():
+        return None
+    candidate = path.with_name("download_diagnostics_pre_resume.tsv")
+    if candidate.exists():
+        index = 2
+        while True:
+            candidate = path.with_name(f"download_diagnostics_pre_resume_{index}.tsv")
+            if not candidate.exists():
+                break
+            index += 1
+    path.replace(candidate)
+    return candidate
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Download exactly one paired-end ENA run and verify ENA byte counts "
-            "and MD5 checksums. HTTPS is attempted first, followed by FTP."
+            "Download exactly one paired-end ENA run using persistent curl resume, "
+            "then verify ENA byte counts and MD5 checksums before finalizing files."
         )
     )
     parser.add_argument("--ena-tsv", required=True, type=Path)
     parser.add_argument("--run", required=True)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--curl", default="curl")
+    parser.add_argument(
+        "--attempts-per-transport",
+        type=int,
+        default=DEFAULT_ATTEMPTS_PER_TRANSPORT,
+    )
     args = parser.parse_args()
 
+    if args.attempts_per_transport < 1:
+        raise SystemExit("--attempts-per-transport must be >= 1")
     if not args.ena_tsv.is_file():
         raise SystemExit(f"ENA TSV absent: {args.ena_tsv}")
+
+    curl = resolve_curl(args.curl)
+    curl_ver = curl_version(curl)
+    print(f"Downloader: {curl} ({curl_ver})", file=sys.stderr)
 
     with args.ena_tsv.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -246,6 +338,10 @@ def main() -> int:
     if provenance.exists():
         raise SystemExit(f"Verified provenance already exists: {provenance}")
 
+    preserved = preserve_prior_diagnostics(diagnostic_path)
+    if preserved is not None:
+        print(f"Preserved prior downloader diagnostics: {preserved}", file=sys.stderr)
+
     manifest_rows: list[dict[str, str]] = []
     diagnostic_rows: list[dict[str, str]] = []
 
@@ -265,21 +361,26 @@ def main() -> int:
                 f"expected md5={expected_md5}",
                 file=sys.stderr,
             )
-            verified, attempts = validated_download(
-                raw_url, destination, expected_md5, expected_size
+            verified, attempts = validated_resumable_download(
+                raw_url,
+                destination,
+                expected_md5,
+                expected_size,
+                curl,
+                args.attempts_per_transport,
             )
-            for attempt in attempts:
-                diagnostic_rows.append(
-                    {
-                        "run_accession": args.run,
-                        "mate_index": str(index),
-                        "filename": filename,
-                        **attempt,
-                    }
-                )
+            diagnostic_rows.extend(
+                {
+                    "run_accession": args.run,
+                    "mate_index": str(index),
+                    "filename": filename,
+                    **attempt,
+                }
+                for attempt in attempts
+            )
             print(
-                f"Verified {filename} via {verified['transport']}: "
-                f"bytes={verified['observed_bytes']} md5={verified['observed_md5']}",
+                f"Verified {filename}: bytes={verified['observed_bytes']} "
+                f"md5={verified['observed_md5']}",
                 file=sys.stderr,
             )
             manifest_rows.append(
@@ -289,14 +390,17 @@ def main() -> int:
                     "filename": filename,
                     "transport": verified["transport"],
                     "ena_url": verified["requested_url"],
-                    "final_url": verified["final_url"],
                     "ena_md5": expected_md5,
                     "observed_md5": verified["observed_md5"],
                     "expected_bytes": "" if expected_size is None else str(expected_size),
                     "observed_bytes": verified["observed_bytes"],
                     "sha256": sha256sum(destination),
+                    "download_protocol": DOWNLOAD_PROTOCOL_VERSION,
+                    "curl_executable": str(curl),
+                    "curl_version": curl_ver,
                 }
             )
+            write_diagnostics(diagnostic_path, diagnostic_rows)
     except Exception as exc:
         if diagnostic_rows:
             write_diagnostics(diagnostic_path, diagnostic_rows)
@@ -304,9 +408,19 @@ def main() -> int:
 
     write_diagnostics(diagnostic_path, diagnostic_rows)
     fields = [
-        "run_accession", "mate_index", "filename", "transport", "ena_url",
-        "final_url", "ena_md5", "observed_md5", "expected_bytes",
-        "observed_bytes", "sha256",
+        "run_accession",
+        "mate_index",
+        "filename",
+        "transport",
+        "ena_url",
+        "ena_md5",
+        "observed_md5",
+        "expected_bytes",
+        "observed_bytes",
+        "sha256",
+        "download_protocol",
+        "curl_executable",
+        "curl_version",
     ]
     with provenance.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
