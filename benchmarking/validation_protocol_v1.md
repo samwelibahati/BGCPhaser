@@ -32,6 +32,8 @@ MIBiG v4.0 is the primary curated BGC source. SRA/ENA provide raw sequencing dat
 
 The previously analysed systems BGRR0055, BGRR0074, BGRR0091, BGRR0079, BGRR0057, BGRR0081 and BGRR0076 are retained as development, control, reproducibility or prior prospective-screen systems. They do not contribute to the primary independent-validation performance estimates.
 
+VAL0001 is additionally retained as the protocol-amendment/development sentinel for G5 amendment A1/A1.1. It remains excluded from primary independent-validation performance estimates under every later version of the amended G5 implementation.
+
 ## Prospective eligibility gates
 
 Eligibility is evaluated in the following order. Screening stops at the first failed gate.
@@ -54,9 +56,17 @@ The locked read-processing and SPAdes workflow produces the canonical GFA and as
 
 ### G5. Anchor localization
 
-Both predefined BGC endpoint anchors localize uniquely and orientation-consistently in the canonical short-read assembly graph.
+Both predefined BGC endpoint anchors must localize uniquely and orientation-consistently on contiguous directed graph walks represented by the canonical SPAdes assembly topology.
 
-For primary expanded validation, the G5 anchor rule is frozen before any new validation endpoint is inspected. MIBiG locus coordinates are interpreted using the database convention of a 1-based inclusive start and a 1-based exclusive end. The left anchor is the first 250 nt inside the curated locus and the right anchor is the last 250 nt inside the curated locus, both extracted from the reference-forward sequence. Each anchor is aligned independently to the canonical SPAdes GFA segment sequences with minimap2 v2.31 using preset `asm5`. A qualifying anchor alignment must cover at least 95% of the 250-nt query and have at least 98% nucleotide identity. Exactly one qualifying physical graph-segment alignment is required for each anchor. The alignment strand defines the corresponding oriented graph state. If both anchors localize to the same physical segment, their oriented coordinates must be compatible with left-to-right traversal of the reference-forward locus. Failure to obtain exactly one qualifying localization for either anchor fails G5. Anchor length, thresholds, mapper preset, or rescue mappings are not altered in response to an individual system outcome.
+The operative G5 rule is protocol amendment A1/A1.1, frozen before VAL0002 and before any primary post-amendment G5 endpoint was inspected. MIBiG locus coordinates are interpreted using the database convention of a 1-based inclusive start and a 1-based exclusive end. The left anchor is the first 250 nt inside the curated locus and the right anchor is the last 250 nt inside the curated locus, both extracted from the reference-forward sequence.
+
+SPAdes `contigs.paths` and `scaffolds.paths` records are parsed as oriented graph-state sequences. Whenever two adjacent states in an assembler record lack the corresponding directed `L`-edge in the canonical GFA, the assembler record is split at that transition. Only maximal contiguous directed graph-walk chunks are spelled. Single-state chunks are retained. Identical oriented chunks are deduplicated. Missing transitions are recorded for audit; no synthetic edge, jump, or inserted `N` sequence is introduced.
+
+Each 250-nt anchor is aligned independently to the spelled contiguous directed graph-walk chunks with minimap2 v2.31 using preset `asm5`. A qualifying alignment must cover at least 95% of the 250-nt query and have at least 98% nucleotide identity. Qualifying alignments are projected back onto oriented graph states and offsets. Forward/reverse assembler representations that resolve to the same oriented physical graph localization are deduplicated by physical walk and offsets.
+
+Exactly one qualifying physical localization is required for the left anchor and exactly one for the right anchor. Failure to obtain exactly one physical localization for either endpoint fails G5. Anchor length, minimum query coverage, minimum identity, minimap2 preset, graph topology, or rescue rules are not changed in response to an individual benchmark outcome.
+
+The superseded single-GFA-segment implementation is retained only as audit history. VAL0001 exposed the representational flaw and remains a permanent amendment sentinel; it cannot be promoted into the primary cohort under A1.1.
 
 ### G6. Directed graph connectivity
 
