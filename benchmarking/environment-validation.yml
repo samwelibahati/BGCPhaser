@@ -8,3 +8,4 @@ dependencies:
   - spades=4.3.0
   - minimap2=2.31
   - networkx=3.5
+  - pytest=8.4
