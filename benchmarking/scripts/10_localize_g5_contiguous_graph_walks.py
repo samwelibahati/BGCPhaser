@@ -28,6 +28,10 @@ ANCHOR_LENGTH = 250
 MIN_QUERY_COVERAGE = 0.95
 MIN_IDENTITY = 0.98
 MINIMAP2_PRESET = "asm5"
+ANALYSIS_ROLES = {
+    "PRIMARY_VALIDATION",
+    "DEVELOPMENT_SENTINEL_PROTOCOL_AMENDMENT_A1_1",
+}
 
 
 def sha256sum(path: Path) -> str:
@@ -284,6 +288,12 @@ def state_text(state) -> str:
     return f"{state[0]}{state[1]}"
 
 
+def primary_contribution(analysis_role: str, status: str) -> str:
+    if analysis_role == "PRIMARY_VALIDATION":
+        return "YES" if status == "PASS" else "NO_G5_FAILURE"
+    return "NO_PROTOCOL_AMENDMENT_SENTINEL"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="G5 A1.1 contiguous directed graph-walk anchor localization")
     parser.add_argument("--reference-fasta", required=True, type=Path)
@@ -293,6 +303,12 @@ def main() -> int:
     parser.add_argument("--mibig-start", required=True, type=int)
     parser.add_argument("--mibig-end", required=True, type=int)
     parser.add_argument("--benchmark-id", required=True)
+    parser.add_argument(
+        "--analysis-role",
+        required=True,
+        choices=sorted(ANALYSIS_ROLES),
+        help="Explicitly label this run as prospective primary validation or the frozen amendment sentinel.",
+    )
     parser.add_argument("--minimap2", default="minimap2")
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
@@ -422,7 +438,7 @@ def main() -> int:
 
     metrics = [
         ("benchmark_id", args.benchmark_id),
-        ("analysis_role", "DEVELOPMENT_SENTINEL_PROTOCOL_AMENDMENT_A1_1"),
+        ("analysis_role", args.analysis_role),
         ("reference_name", reference_name),
         ("reference_length", str(len(reference_sequence))),
         ("reference_sha256", sha256sum(args.reference_fasta)),
@@ -488,7 +504,7 @@ def main() -> int:
     metrics.extend([
         ("g5_contiguous_walk_status", status),
         ("g5_contiguous_walk_failure_reason", reason),
-        ("primary_validation_contribution", "NO_PROTOCOL_AMENDMENT_SENTINEL"),
+        ("primary_validation_contribution", primary_contribution(args.analysis_role, status)),
     ])
 
     with summary_tsv.open("w", encoding="utf-8", newline="") as handle:
