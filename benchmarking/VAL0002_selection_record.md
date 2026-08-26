@@ -99,6 +99,17 @@ The A1.1 contiguous directed graph-walk implementation was generalized to requir
 
 VAL0002 must be invoked with `--analysis-role PRIMARY_VALIDATION`.
 
+## Verified reference FASTA
+
+The exact reference FASTA was acquired as accession-version `CP001630.1` before G5 localization and validated as a single-record FASTA.
+
+- FASTA header: `>CP001630.1 Actinosynnema mirum DSM 43827, complete genome`
+- sequence length: `8248144 bp`
+- SHA-256: `4984336cf490d6f8152611b89a842a4256c069ad7578a675787f2bf2942d43ff`
+- validation status: `PASS`
+
+The SHA-256 was independently reproduced with `shasum -a 256` before G5.
+
 ## Outcome masking state at this freeze
 
 - BGCPhaser score inspected: `NO`
@@ -107,4 +118,4 @@ VAL0002 must be invoked with `--analysis-role PRIMARY_VALIDATION`.
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operation is acquisition and checksum recording of the exact `CP001630.1` reference FASTA, followed by G5 using the frozen locus coordinates above.
+The next permitted operation is G5 A1.1 contiguous directed graph-walk endpoint localization using reference `CP001630.1`, start `3113324`, end `3141040`, and `--analysis-role PRIMARY_VALIDATION`.
