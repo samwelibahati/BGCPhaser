@@ -1,6 +1,6 @@
 # VAL0002 prospective validation selection record
 
-Status: frozen before G5 endpoint localization
+Status: terminal G5 failure under frozen prospective rules
 
 Date frozen: 2026-08-26
 
@@ -28,7 +28,7 @@ The exact row was taken from the locally generated `benchmarking/mibig_modular_p
 - PKS module count: `0`
 - total modular count: `3`
 
-The arithmetic check `3141040 - 3113324 = 27716` is consistent with the frozen coordinate convention. These coordinates, anchor length, localization thresholds, and mapper settings cannot be changed in response to the VAL0002 G5 result.
+The arithmetic check `3141040 - 3113324 = 27716` is consistent with the frozen coordinate convention. These coordinates, anchor length, localization thresholds, and mapper settings were frozen before the VAL0002 G5 result.
 
 ## Prospective run selection
 
@@ -89,7 +89,7 @@ Key recorded outputs:
 - GFA links: `723`
 - SHA-256 manifest problems: `0`
 
-The eight captured warning lines are repeated macOS `setrlimit(2)` memory-limit warnings plus the SPAdes warning summary. SPAdes completed and produced every required canonical output. The fragmented/high-total-length assembly remains unchanged; no system-specific reassembly, subsampling, alternate k-mer series, or rescue workflow is permitted.
+The eight captured warning lines are repeated macOS `setrlimit(2)` memory-limit warnings plus the SPAdes warning summary. SPAdes completed and produced every required canonical output. The fragmented/high-total-length assembly remained unchanged; no system-specific reassembly, subsampling, alternate k-mer series, or rescue workflow was introduced.
 
 ## Pre-G5 implementation freeze
 
@@ -97,7 +97,7 @@ The A1.1 contiguous directed graph-walk implementation was generalized to requir
 
 - `tests/test_g5_contiguous_graph_walks.py`: `3 passed`
 
-VAL0002 must be invoked with `--analysis-role PRIMARY_VALIDATION`.
+VAL0002 was invoked with `--analysis-role PRIMARY_VALIDATION`.
 
 ## Verified reference FASTA
 
@@ -110,12 +110,52 @@ The exact reference FASTA was acquired as accession-version `CP001630.1` before 
 
 The SHA-256 was independently reproduced with `shasum -a 256` before G5.
 
-## Outcome masking state at this freeze
+## G5 outcome
+
+G5 A1.1 used:
+
+- minimap2 `2.31-r1302`
+- preset `asm5`
+- anchor length `250 nt`
+- minimum query coverage `0.95`
+- minimum identity `0.98`
+- MIBiG interval `3113324-3141040`
+- analysis role `PRIMARY_VALIDATION`
+
+Canonical-input hashes:
+
+- GFA SHA-256: `a9d4ec8a6f063b5e4e5b7b684ff60fdb4a559fa1b13e7b07977d73f260880dc4`
+- `contigs.paths` SHA-256: `e52def12d1bf8609fc687d1955851fbfe0d1fcfe69bd05a78625abdbc69e0518`
+- `scaffolds.paths` SHA-256: `9ea04cc0442088879ba77a41efdda02cbb1c8ec23ca2ae930387afc402fff15d`
+- minimap2 executable SHA-256: `007777300e7f1dc464300135d1b16e5c47bef40ae19a1017c1504d33b2509142`
+
+A1.1 parsed `90476` assembler-path records into `45238` unique contiguous directed graph-walk chunks. There were `0` missing-edge transition observations and `0` unique missing-edge transitions.
+
+Localization result:
+
+- left anchor qualifying physical localizations: `0`
+- right anchor qualifying physical localizations: `1`
+- right physical walk: `5762466+`
+- right offsets: `43803-44046`
+- right query coverage: `0.972000000000`
+- right identity: `1.000000000000`
+- right raw alignment count: `2`
+- right witness chunks: `CW000003,CW000004`
+
+G5 status: `FAIL`.
+
+Failure reason: `left_anchor_physical_localizations=0`.
+
+Primary-validation contribution: `NO_G5_FAILURE`.
+
+VAL0002 stops at G5. It does not proceed to G6, candidate enumeration, intrinsic scoring, chemistry evaluation, truth ranking, or reference-similarity ranking. No anchor length, threshold, mapper preset, assembly setting, or rescue rule is changed in response to this outcome.
+
+## Outcome masking state after terminal G5 decision
 
 - BGCPhaser score inspected: `NO`
 - truth rank inspected: `NO`
 - chemistry outcome inspected: `NO`
 - reference-similarity outcome inspected: `NO`
-- G5 endpoint localization inspected: `NO`
+- candidate count inspected: `NO`
 
-The next permitted operation is G5 A1.1 contiguous directed graph-walk endpoint localization using reference `CP001630.1`, start `3113324`, end `3141040`, and `--analysis-role PRIMARY_VALIDATION`.
+VAL0002 is retained in the screening registry as a prospective G5 failure and excluded from the primary ambiguous-candidate ranking-performance cohort.
