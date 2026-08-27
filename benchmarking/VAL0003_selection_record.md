@@ -1,6 +1,6 @@
 # VAL0003 prospective validation selection record
 
-Status: G4 passed with QC warning; G5 not yet run
+Status: G4 passed with QC warning; G5 not yet run; exact reference and hardened G5 implementation verified
 
 Date frozen: 2026-08-27
 
@@ -122,6 +122,24 @@ Before any VAL0003 endpoint localization was inspected, the G5 implementation wa
 
 These safeguards do not alter the frozen 250-nt anchor length, >=95% query coverage threshold, >=98% identity threshold, minimap2 2.31 `asm5` preset, graph-walk construction, or physical-localization uniqueness rule. VAL0003 G5 remained uninspected when the implementation and regression tests were updated.
 
+Focused regression test after the hardening:
+
+- command: `python -m pytest tests/test_g5_contiguous_graph_walks.py -q`
+- result: `4 passed in 0.23s`
+- G5 implementation commit present before VAL0003 G5: `32213a3cc1310b5cb781f0fdfa05eab04c9d6de3`
+
+## Exact reference frozen before G5
+
+The reference FASTA was acquired from NCBI using accession `CP000075.1` and validated before any VAL0003 G5 endpoint localization.
+
+- FASTA header: `>CP000075.1 Pseudomonas syringae pv. syringae B728a, complete genome`
+- sequence length: `6093698 bp`
+- FASTA SHA-256: `36a643d87d415d0ec19e159a89b2bd548c3e5e7bde52f34af7dca8e22092152b`
+- independent `shasum -a 256` result: exact match
+- reference validation: `PASS`
+
+The locally frozen MIBiG interval `3060225-3182922` lies within this exact reference and remains the only permitted endpoint interval for VAL0003 G5.
+
 ## Outcome masking state at this freeze
 
 - BGCPhaser score inspected: `NO`
@@ -130,4 +148,4 @@ These safeguards do not alter the frozen 250-nt anchor length, >=95% query cover
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operations are regression testing of the hardened G5 implementation and acquisition/checksum validation of exact reference `CP000075.1`, followed by G5 only after both are complete.
+The next permitted operation is G5 A1.1 anchor localization with the frozen exact reference, canonical G4 graph/path files, frozen MIBiG interval, minimap2 2.31 `asm5`, 250-nt endpoint anchors, >=95% query coverage, and >=98% identity. No rescue rule, threshold change, reassembly, or alternate reference is permitted in response to the outcome.
