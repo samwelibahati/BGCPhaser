@@ -73,8 +73,43 @@ def test_reverse_chunk_alignment_collapses_to_same_physical_localization_key() -
     assert plus_loc["end_offset"] == reverse_loc["end_offset"]
 
 
+def test_same_inner_state_coordinate_order_requires_left_before_right() -> None:
+    state = ("S", "+")
+    left = {
+        "outer_end_state": state,
+        "end_offset": 250,
+    }
+    right = {
+        "outer_start_state": state,
+        "start_offset": 500,
+    }
+    compatible, status = g5.same_inner_state_coordinate_order(left, right)
+    assert compatible is True
+    assert status == "PASS"
+
+    right_bad = {
+        "outer_start_state": state,
+        "start_offset": 200,
+    }
+    compatible, status = g5.same_inner_state_coordinate_order(left, right_bad)
+    assert compatible is False
+    assert status == "FAIL"
+
+    other_state = ("T", "+")
+    right_other = {
+        "outer_start_state": other_state,
+        "start_offset": 0,
+    }
+    compatible, status = g5.same_inner_state_coordinate_order(left, right_other)
+    assert compatible is True
+    assert status == "NOT_APPLICABLE"
+
+
 def test_primary_contribution_depends_on_role_and_g5_status() -> None:
-    assert g5.primary_contribution("PRIMARY_VALIDATION", "PASS") == "YES"
+    assert (
+        g5.primary_contribution("PRIMARY_VALIDATION", "PASS")
+        == "PENDING_LATER_GATES"
+    )
     assert g5.primary_contribution("PRIMARY_VALIDATION", "FAIL") == "NO_G5_FAILURE"
     assert (
         g5.primary_contribution("DEVELOPMENT_SENTINEL_PROTOCOL_AMENDMENT_A1_1", "PASS")
