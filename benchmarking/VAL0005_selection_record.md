@@ -1,6 +1,6 @@
 # VAL0005 prospective validation selection record
 
-Status: G3 passed; raw paired-end reads downloaded and verified; G4 not yet run
+Status: G4 passed with environmental QC warning; G5 not yet run
 
 Date frozen: 2026-08-27
 
@@ -52,21 +52,66 @@ Selection-lock hashes:
 - prospective candidate table SHA-256: `35c35dad712f8833f50c2a476417fd2a24288c26b3f151718d85eae282d63c81`
 - locked ENA one-row manifest SHA-256: `dd1357a46dec87b4933902526149e1dcff467316548d749987aab3e7dae3e183`
 
-## Predeclared FASTQ files
-
-- `SRR21665144_1.fastq.gz`: expected 252,462,925 bytes; ENA MD5 `53494d1b8e767d87f1a07288f295fadd`
-- `SRR21665144_2.fastq.gz`: expected 315,890,191 bytes; ENA MD5 `f520582f699c11e7d2eba972445e2174`
-- total expected compressed download: `568353116 bytes`
-
 ## Verified raw FASTQs
 
 Both files were finalized only after exact ENA byte-count and MD5 verification under downloader protocol `1.3-resumable-curl` using `/usr/bin/curl` 8.7.1.
 
-- `SRR21665144_1.fastq.gz`: observed 252,462,925 bytes; observed MD5 `53494d1b8e767d87f1a07288f295fadd`; SHA-256 `bfee42f320bbaa85f245c0aeeb36b810b609e91ee074e53a115bd144f1df0a92`
-- `SRR21665144_2.fastq.gz`: observed 315,890,191 bytes; observed MD5 `f520582f699c11e7d2eba972445e2174`; SHA-256 `3e50269b3b08d4c7295d29d284b6241639ecd903aa566128f3db6a6bf4dc0514`
+- `SRR21665144_1.fastq.gz`: 252,462,925 bytes; MD5 `53494d1b8e767d87f1a07288f295fadd`; SHA-256 `bfee42f320bbaa85f245c0aeeb36b810b609e91ee074e53a115bd144f1df0a92`
+- `SRR21665144_2.fastq.gz`: 315,890,191 bytes; MD5 `f520582f699c11e7d2eba972445e2174`; SHA-256 `3e50269b3b08d4c7295d29d284b6241639ecd903aa566128f3db6a6bf4dc0514`
 - total verified compressed bytes: `568353116`
 
-Mate 1 encountered transient HTTPS transport interruptions. Attempts 1-6 ended with curl exit code 52 before bytes were retained; attempt 7 reached 240,074,752 bytes before curl exit code 18; attempts 8-13 retained that partial file with exit code 52; attempts 14 and 15 advanced the partial file to 240,138,435 and 240,210,118 bytes respectively with exit code 18; attempt 16 resumed from 240,210,118 bytes and completed with the exact expected byte count and MD5. Mate 2 completed and verified on HTTPS attempt 1. These transport interruptions did not alter the finalized FASTQ contents and are preserved in `download_diagnostics.tsv` as provenance rather than treated as biological or sequencing QC failures.
+Mate 1 required resumable HTTPS retries and verified on attempt 16; mate 2 verified on attempt 1. The transport history is retained in `download_diagnostics.tsv` and does not alter finalized FASTQ integrity.
+
+## G4 outcome
+
+Frozen software:
+
+- fastp `1.3.6`
+- SPAdes `4.3.0`
+
+G4 classification: `PASS_WITH_QC_WARNING`.
+
+All integrity manifests passed:
+
+- raw SHA-256 manifest: `2/2 PASS`
+- processed SHA-256 manifest: `4/4 PASS`
+- canonical SPAdes SHA-256 manifest: `7/7 PASS`
+- SHA-256 manifest problems: `0`
+- `g4_integrity_status`: `PASS`
+
+fastp summary:
+
+- reads before filtering: `3060286`
+- reads after filtering: `2954414`
+- read retention fraction: `0.965404540621`
+- bases before filtering: `899699637`
+- bases after filtering: `791839584`
+- base retention fraction: `0.880115486809`
+- post-filter Q20 rate: `0.99267`
+- post-filter Q30 rate: `0.959816`
+- post-filter GC content: `0.43653`
+- low-quality reads: `288`
+- reads with too many N: `0`
+- too-short reads: `105250`
+
+Assembly summary:
+
+- contigs: `653`
+- contig total bases: `4475982`
+- contig maximum length: `237637`
+- contig N50: `60384`
+- scaffolds: `652`
+- scaffold total bases: `4476082`
+- scaffold maximum length: `237637`
+- scaffold N50: `60384`
+- canonical GFA segments: `1735`
+- canonical GFA links: `2332`
+- canonical GFA segment bases: `4601711`
+- GFA bytes: `4754738`
+- `contigs.paths` bytes: `75741`
+- `scaffolds.paths` bytes: `75670`
+
+SPAdes emitted ten warning-containing log lines, all attributable to the repeated macOS `setrlimit(2)` failure to impose the requested 250-Gb process memory limit plus the pipeline summary that warnings were present. No coverage-model, erroneous-connection-threshold, graph-simplification, or assembly-content warning was reported. SPAdes completed and all canonical outputs passed SHA-256 verification. The warning is therefore retained transparently as an environmental QC observation; no reassembly, parameter change, or exclusion is introduced.
 
 ## Outcome masking state at this freeze
 
@@ -76,4 +121,4 @@ Mate 1 encountered transient HTTPS transport interruptions. Attempts 1-6 ended w
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operation is frozen G4 preprocessing and SPAdes assembly using fastp 1.3.6 and SPAdes 4.3.0. No alternate run, read subset, assembly parameter tuning, reference guidance, trusted contigs, or outcome-driven substitution is permitted.
+The next permitted operations are acquisition and checksum validation of exact reference `FN667742.1`, followed by G5 A1.1 only after the exact reference is frozen. The G5 interval remains `2154724-2170060` and no outcome-driven reference, threshold, or assembly substitution is permitted.
