@@ -1,6 +1,6 @@
 # VAL0005 prospective validation selection record
 
-Status: G3 passed; raw paired-end reads not yet downloaded
+Status: G3 passed; raw paired-end reads downloaded and verified; G4 not yet run
 
 Date frozen: 2026-08-27
 
@@ -58,6 +58,16 @@ Selection-lock hashes:
 - `SRR21665144_2.fastq.gz`: expected 315,890,191 bytes; ENA MD5 `f520582f699c11e7d2eba972445e2174`
 - total expected compressed download: `568353116 bytes`
 
+## Verified raw FASTQs
+
+Both files were finalized only after exact ENA byte-count and MD5 verification under downloader protocol `1.3-resumable-curl` using `/usr/bin/curl` 8.7.1.
+
+- `SRR21665144_1.fastq.gz`: observed 252,462,925 bytes; observed MD5 `53494d1b8e767d87f1a07288f295fadd`; SHA-256 `bfee42f320bbaa85f245c0aeeb36b810b609e91ee074e53a115bd144f1df0a92`
+- `SRR21665144_2.fastq.gz`: observed 315,890,191 bytes; observed MD5 `f520582f699c11e7d2eba972445e2174`; SHA-256 `3e50269b3b08d4c7295d29d284b6241639ecd903aa566128f3db6a6bf4dc0514`
+- total verified compressed bytes: `568353116`
+
+Mate 1 encountered transient HTTPS transport interruptions. Attempts 1-6 ended with curl exit code 52 before bytes were retained; attempt 7 reached 240,074,752 bytes before curl exit code 18; attempts 8-13 retained that partial file with exit code 52; attempts 14 and 15 advanced the partial file to 240,138,435 and 240,210,118 bytes respectively with exit code 18; attempt 16 resumed from 240,210,118 bytes and completed with the exact expected byte count and MD5. Mate 2 completed and verified on HTTPS attempt 1. These transport interruptions did not alter the finalized FASTQ contents and are preserved in `download_diagnostics.tsv` as provenance rather than treated as biological or sequencing QC failures.
+
 ## Outcome masking state at this freeze
 
 - BGCPhaser score inspected: `NO`
@@ -66,4 +76,4 @@ Selection-lock hashes:
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operation is exact paired FASTQ download under the frozen resumable ENA downloader with byte-count and MD5 verification. No alternate run, read subset, assembly parameter tuning, or outcome-driven substitution is permitted.
+The next permitted operation is frozen G4 preprocessing and SPAdes assembly using fastp 1.3.6 and SPAdes 4.3.0. No alternate run, read subset, assembly parameter tuning, reference guidance, trusted contigs, or outcome-driven substitution is permitted.
