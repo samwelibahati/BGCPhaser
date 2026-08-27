@@ -31,11 +31,28 @@ def main() -> int:
     parser.add_argument("--expected-study", required=True)
     parser.add_argument("--expected-reference", required=True)
     parser.add_argument("--expected-assembly", required=True)
+    parser.add_argument(
+        "--selection-basis",
+        required=True,
+        help="Pre-inspection provenance basis supporting this run selection.",
+    )
+    parser.add_argument(
+        "--alternative-run",
+        default="NA",
+        help="Alternative same-source run considered before selection, if any.",
+    )
+    parser.add_argument(
+        "--alternative-reason",
+        default="NA",
+        help="Prospectively recorded reason the alternative run was not selected.",
+    )
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
 
     if not args.candidates.is_file():
         raise SystemExit(f"Candidate table absent: {args.candidates}")
+    if not args.selection_basis.strip():
+        raise SystemExit("--selection-basis must be non-empty")
 
     with args.candidates.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -115,6 +132,9 @@ def main() -> int:
         ("run_accession", args.run),
         ("experiment_accession", row.get("experiment_accession", "")),
         ("scientific_name", row.get("scientific_name", "")),
+        ("study_title", row.get("study_title", "")),
+        ("sample_title", row.get("sample_title", "")),
+        ("experiment_title", row.get("experiment_title", "")),
         ("library_strategy", row.get("library_strategy", "")),
         ("library_source", row.get("library_source", "")),
         ("library_selection", row.get("library_selection", "")),
@@ -125,9 +145,9 @@ def main() -> int:
         ("base_count", row.get("base_count", "")),
         ("provenance_status", row.get("provenance_status", "")),
         ("provenance_flag", row.get("provenance_flag", "")),
-        ("selection_basis", "EXACT_BIOSAMPLE_AND_BIOPROJECT; RANDOM_PAIRED_ILLUMINA_WGS"),
-        ("alternative_same_sample_run", "SRR3924417" if args.run == "SRR8526193" else "NA"),
-        ("alternative_reason_not_selected", "library_selection=size fractionation" if args.run == "SRR8526193" else "NA"),
+        ("selection_basis", args.selection_basis.strip()),
+        ("alternative_same_source_run", args.alternative_run.strip() or "NA"),
+        ("alternative_reason_not_selected", args.alternative_reason.strip() or "NA"),
         ("score_inspected", "NO"),
         ("truth_rank_inspected", "NO"),
         ("chemistry_outcome_inspected", "NO"),
