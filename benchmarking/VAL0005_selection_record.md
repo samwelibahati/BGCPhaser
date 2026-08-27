@@ -1,6 +1,6 @@
 # VAL0005 prospective validation selection record
 
-Status: G4 passed with environmental QC warning; G5 not yet run
+Status: G4 passed with environmental QC warning; exact reference verified; G5 not yet run
 
 Date frozen: 2026-08-27
 
@@ -113,6 +113,18 @@ Assembly summary:
 
 SPAdes emitted ten warning-containing log lines, all attributable to the repeated macOS `setrlimit(2)` failure to impose the requested 250-Gb process memory limit plus the pipeline summary that warnings were present. No coverage-model, erroneous-connection-threshold, graph-simplification, or assembly-content warning was reported. SPAdes completed and all canonical outputs passed SHA-256 verification. The warning is therefore retained transparently as an environmental QC observation; no reassembly, parameter change, or exclusion is introduced.
 
+## Exact reference frozen before G5
+
+The exact reference FASTA was acquired by accession `FN667742.1` and validated before any VAL0005 endpoint localization.
+
+- FASTA header: `>FN667742.1 Xenorhabdus nematophila ATCC 19061 chromosome, complete genome`
+- sequence length: `4432590 bp`
+- FASTA SHA-256: `624174a6d371828bf52fd11a264a90835054d7c67914f2f844d16da840521a45`
+- independent `shasum -a 256` result: exact match
+- reference validation: `PASS`
+
+The frozen MIBiG interval `2154724-2170060` lies within this exact sequence and remains the only permitted endpoint interval for VAL0005 G5.
+
 ## Outcome masking state at this freeze
 
 - BGCPhaser score inspected: `NO`
@@ -121,4 +133,4 @@ SPAdes emitted ten warning-containing log lines, all attributable to the repeate
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operations are acquisition and checksum validation of exact reference `FN667742.1`, followed by G5 A1.1 only after the exact reference is frozen. The G5 interval remains `2154724-2170060` and no outcome-driven reference, threshold, or assembly substitution is permitted.
+The next permitted operation is G5 A1.1 anchor localization using this exact reference, the canonical G4 graph/path files, frozen interval `2154724-2170060`, minimap2 2.31 `asm5`, 250-nt endpoint anchors, >=95% query coverage and >=98% identity. No rescue rule, threshold change, reassembly, alternate reference, or outcome-driven substitution is permitted.
