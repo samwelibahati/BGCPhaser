@@ -32,6 +32,14 @@ def main() -> int:
     parser.add_argument("--expected-reference", required=True)
     parser.add_argument("--expected-assembly", required=True)
     parser.add_argument(
+        "--expected-library-selection",
+        default="RANDOM",
+        help=(
+            "Exact ENA/SRA library_selection value expected for the prospectively "
+            "selected run. Defaults to RANDOM to preserve prior lock behavior."
+        ),
+    )
+    parser.add_argument(
         "--selection-basis",
         required=True,
         help="Pre-inspection provenance basis supporting this run selection.",
@@ -53,6 +61,8 @@ def main() -> int:
         raise SystemExit(f"Candidate table absent: {args.candidates}")
     if not args.selection_basis.strip():
         raise SystemExit("--selection-basis must be non-empty")
+    if not args.expected_library_selection.strip():
+        raise SystemExit("--expected-library-selection must be non-empty")
 
     with args.candidates.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -78,7 +88,7 @@ def main() -> int:
         "library_layout": "PAIRED",
         "instrument_platform": "ILLUMINA",
         "library_source": "GENOMIC",
-        "library_selection": "RANDOM",
+        "library_selection": args.expected_library_selection.strip(),
         "provenance_status": "NO_DERIVATIVE_KEYWORD_DETECTED",
     }
     failures: list[str] = []
@@ -138,6 +148,7 @@ def main() -> int:
         ("library_strategy", row.get("library_strategy", "")),
         ("library_source", row.get("library_source", "")),
         ("library_selection", row.get("library_selection", "")),
+        ("expected_library_selection", args.expected_library_selection.strip()),
         ("library_layout", row.get("library_layout", "")),
         ("instrument_platform", row.get("instrument_platform", "")),
         ("instrument_model", row.get("instrument_model", "")),
