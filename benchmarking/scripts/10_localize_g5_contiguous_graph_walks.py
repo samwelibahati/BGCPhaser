@@ -288,9 +288,19 @@ def state_text(state) -> str:
     return f"{state[0]}{state[1]}"
 
 
+def same_inner_state_coordinate_order(left_item, right_item) -> tuple[bool, str]:
+    left_inner = left_item["outer_end_state"]
+    right_inner = right_item["outer_start_state"]
+    if left_inner != right_inner:
+        return True, "NOT_APPLICABLE"
+    if int(left_item["end_offset"]) <= int(right_item["start_offset"]):
+        return True, "PASS"
+    return False, "FAIL"
+
+
 def primary_contribution(analysis_role: str, status: str) -> str:
     if analysis_role == "PRIMARY_VALIDATION":
-        return "YES" if status == "PASS" else "NO_G5_FAILURE"
+        return "PENDING_LATER_GATES" if status == "PASS" else "NO_G5_FAILURE"
     return "NO_PROTOCOL_AMENDMENT_SENTINEL"
 
 
@@ -429,12 +439,31 @@ def main() -> int:
     right_values = list(physical["right"].values())
     status = "PASS"
     reason = ""
+    same_inner_state = "NA"
+    same_state_order_status = "NOT_EVALUATED"
     if len(left_values) != 1:
         status = "FAIL"
         reason = f"left_anchor_physical_localizations={len(left_values)}"
     elif len(right_values) != 1:
         status = "FAIL"
         reason = f"right_anchor_physical_localizations={len(right_values)}"
+    else:
+        left_item = left_values[0]
+        right_item = right_values[0]
+        same_inner_state = (
+            "YES" if left_item["outer_end_state"] == right_item["outer_start_state"] else "NO"
+        )
+        order_ok, same_state_order_status = same_inner_state_coordinate_order(
+            left_item, right_item
+        )
+        if not order_ok:
+            status = "FAIL"
+            reason = (
+                "same_inner_state_coordinate_order_incompatible:"
+                f"{state_text(left_item['outer_end_state'])}:"
+                f"left_end_offset={left_item['end_offset']}>"
+                f"right_start_offset={right_item['start_offset']}"
+            )
 
     metrics = [
         ("benchmark_id", args.benchmark_id),
@@ -465,6 +494,8 @@ def main() -> int:
         ("total_spelled_contiguous_walk_bases", str(sum(len(v) for v in sequence_by_id.values()))),
         ("left_physical_localization_count", str(len(left_values))),
         ("right_physical_localization_count", str(len(right_values))),
+        ("same_inner_state", same_inner_state),
+        ("same_inner_state_coordinate_order_status", same_state_order_status),
     ]
 
     for label, values in (("left", left_values), ("right", right_values)):
