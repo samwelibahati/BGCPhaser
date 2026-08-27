@@ -1,6 +1,6 @@
 # VAL0003 prospective validation selection record
 
-Status: G4 passed with QC warning; G5 not yet run; exact reference and hardened G5 implementation verified
+Status: terminal G5 A1.1 failure; excluded from G6-G9 and primary ranking-performance eligibility
 
 Date frozen: 2026-08-27
 
@@ -25,7 +25,7 @@ The exact row was taken from the locally generated `benchmarking/mibig_modular_p
 - locus completeness: `Unknown`
 - total module count: `9`
 
-The arithmetic check `3182922 - 3060225 = 122697` is consistent with the frozen coordinate convention. These coordinates cannot be changed in response to later VAL0003 outcomes.
+The arithmetic check `3182922 - 3060225 = 122697` is consistent with the frozen coordinate convention. These coordinates were not changed in response to the VAL0003 outcome.
 
 ## Prospective run selection
 
@@ -111,7 +111,7 @@ Assembly summary:
 - canonical GFA links: `32`
 - canonical GFA segment bases: `3740594`
 
-SPAdes produced eleven warning lines. In addition to the macOS `setrlimit(2)` memory-limit warning, the log reported an improperly determined erroneous-connection coverage threshold and a k-mer coverage-model valley reset to 4. SPAdes nevertheless finished and produced every required canonical output. The approximately 30% read/base retention and assembly warnings are retained as QC observations. The frozen protocol contains no predeclared exclusion threshold for these observations, so no reassembly, parameter tuning, alternate k-mers, or rescue workflow is introduced.
+SPAdes produced eleven warning lines. In addition to the macOS `setrlimit(2)` memory-limit warning, the log reported an improperly determined erroneous-connection coverage threshold and a k-mer coverage-model valley reset to 4. SPAdes nevertheless finished and produced every required canonical output. The approximately 30% read/base retention and assembly warnings are retained as QC observations. The frozen protocol contains no predeclared exclusion threshold for these observations, so no reassembly, parameter tuning, alternate k-mers, or rescue workflow was introduced.
 
 ## Pre-G5 implementation safeguard
 
@@ -120,7 +120,7 @@ Before any VAL0003 endpoint localization was inspected, the G5 implementation wa
 1. if the unique left anchor ends and the unique right anchor begins on the same reference-forward oriented graph state, the left alignment must end at or before the right alignment begins on that state; otherwise G5 fails as coordinate-order incompatible;
 2. a primary-validation G5 pass is recorded as `PENDING_LATER_GATES`, since final primary-validation eligibility still depends on G6-G9.
 
-These safeguards do not alter the frozen 250-nt anchor length, >=95% query coverage threshold, >=98% identity threshold, minimap2 2.31 `asm5` preset, graph-walk construction, or physical-localization uniqueness rule. VAL0003 G5 remained uninspected when the implementation and regression tests were updated.
+These safeguards did not alter the frozen 250-nt anchor length, >=95% query coverage threshold, >=98% identity threshold, minimap2 2.31 `asm5` preset, graph-walk construction, or physical-localization uniqueness rule. VAL0003 G5 remained uninspected when the implementation and regression tests were updated.
 
 Focused regression test after the hardening:
 
@@ -138,14 +138,59 @@ The reference FASTA was acquired from NCBI using accession `CP000075.1` and vali
 - independent `shasum -a 256` result: exact match
 - reference validation: `PASS`
 
-The locally frozen MIBiG interval `3060225-3182922` lies within this exact reference and remains the only permitted endpoint interval for VAL0003 G5.
+The locally frozen MIBiG interval `3060225-3182922` was used unchanged for VAL0003 G5.
 
-## Outcome masking state at this freeze
+## G5 A1.1 terminal outcome
+
+Frozen G5 inputs and software:
+
+- reference SHA-256: `36a643d87d415d0ec19e159a89b2bd548c3e5e7bde52f34af7dca8e22092152b`
+- GFA SHA-256: `6901c705c8a52407d3b950c9b7d33c30f28c3618c1916187df8ca8a9447043cc`
+- `contigs.paths` SHA-256: `9bfdfb8b8b26257d289b71f8131fcc20863652d9a3ad614a7d9707b9f1cda3ca`
+- `scaffolds.paths` SHA-256: `cba83e42eb3c3a3090a9e736903ac3ff712cedb79028c235fa35b073c2aabefb`
+- Python: `3.11.16`
+- NetworkX: `3.5`
+- minimap2 executable: `/Users/rmaghembe/miniforge3_arm64/pkgs/minimap2-2.31-h6bd33b9_0/bin/minimap2`
+- minimap2 SHA-256: `007777300e7f1dc464300135d1b16e5c47bef40ae19a1017c1504d33b2509142`
+- minimap2 version: `2.31-r1302`
+- minimap2 preset: `asm5`
+- anchor length: `250 nt`
+- minimum query coverage: `0.95`
+- minimum identity: `0.98`
+
+Reference-forward anchor intervals used by the implementation:
+
+- left: Python0 `3060224:3060474`
+- right: Python0 `3182671:3182921`
+
+A1.1 topology audit:
+
+- assembler path records: `27324`
+- missing-edge transition observations: `0`
+- unique missing-edge transitions: `0`
+- unique contiguous directed graph-walk chunks: `13662`
+- total spelled contiguous-walk bases: `7481056`
+
+Anchor-localization result:
+
+- left physical localizations: `0`
+- right physical localizations: `0`
+- same-inner-state coordinate-order check: `NOT_EVALUATED`
+- G5 status: `FAIL`
+- recorded failure reason: `left_anchor_physical_localizations=0`
+- primary-validation contribution: `NO_G5_FAILURE`
+
+Both endpoint anchors therefore fail the frozen G5 uniqueness/localization requirement. The system stops at G5 and cannot proceed to G6, G7 candidate enumeration, G8 truth-representation testing, G9 scoreability, or ranking-performance analysis.
+
+No threshold, anchor length, minimap2 preset, graph definition, reassembly strategy, or alternate reference was changed after observing this outcome. No rescue was attempted.
+
+## Final outcome-masking state
 
 - BGCPhaser score inspected: `NO`
 - truth rank inspected: `NO`
 - chemistry outcome inspected: `NO`
 - reference-similarity outcome inspected: `NO`
-- G5 endpoint localization inspected: `NO`
+- candidate count: `NA`
+- G6-G9: `NOT RUN`
 
-The next permitted operation is G5 A1.1 anchor localization with the frozen exact reference, canonical G4 graph/path files, frozen MIBiG interval, minimap2 2.31 `asm5`, 250-nt endpoint anchors, >=95% query coverage, and >=98% identity. No rescue rule, threshold change, reassembly, or alternate reference is permitted in response to the outcome.
+VAL0003 remains in the complete prospective screening denominator and is reported as a terminal G5 candidate-localization failure. It does not contribute to the primary eligible ambiguous ranking-performance cohort.
