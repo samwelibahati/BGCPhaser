@@ -1,6 +1,6 @@
 # VAL0003 prospective validation selection record
 
-Status: G3 passed; raw paired-end reads verified; G4 not yet run
+Status: G4 passed with QC warning; G5 not yet run
 
 Date frozen: 2026-08-27
 
@@ -65,6 +65,63 @@ Total compressed download size: `269252329 bytes`.
 
 Download executable recorded by the provenance manifest: `/usr/bin/curl`, curl `8.7.1 (x86_64-apple-darwin25.0)`.
 
+## G4 outcome
+
+Frozen software:
+
+- fastp `1.3.6`
+- SPAdes `4.3.0`
+
+G4 classification: `PASS_WITH_QC_WARNING`.
+
+Integrity checks:
+
+- raw SHA-256 manifest: `2/2 PASS`
+- processed SHA-256 manifest: `4/4 PASS`
+- canonical SPAdes SHA-256 manifest: `7/7 PASS`
+- SHA-256 manifest problems: `0`
+- `g4_integrity_status`: `PASS`
+
+fastp summary:
+
+- reads before filtering: `7102266`
+- reads after filtering: `2196916`
+- read retention fraction: `0.309326065794`
+- bases before filtering: `255681576`
+- bases after filtering: `76760170`
+- base retention fraction: `0.300217838144`
+- post-filter Q20 rate: `0.94392`
+- post-filter Q30 rate: `0.866672`
+- post-filter GC content: `0.560721`
+- low-quality reads: `4986`
+- reads with too many N: `0`
+- too-short reads: `4900298`
+
+Assembly summary:
+
+- contigs: `5319`
+- contig total bases: `3725011`
+- contig maximum length: `14656`
+- contig N50: `1129`
+- scaffolds: `2437`
+- scaffold total bases: `4061894`
+- scaffold maximum length: `30845`
+- scaffold N50: `3167`
+- canonical GFA segments: `6833`
+- canonical GFA links: `32`
+- canonical GFA segment bases: `3740594`
+
+SPAdes produced eleven warning lines. In addition to the macOS `setrlimit(2)` memory-limit warning, the log reported an improperly determined erroneous-connection coverage threshold and a k-mer coverage-model valley reset to 4. SPAdes nevertheless finished and produced every required canonical output. The approximately 30% read/base retention and assembly warnings are retained as QC observations. The frozen protocol contains no predeclared exclusion threshold for these observations, so no reassembly, parameter tuning, alternate k-mers, or rescue workflow is introduced.
+
+## Pre-G5 implementation safeguard
+
+Before any VAL0003 endpoint localization was inspected, the G5 implementation was hardened in two protocol-consistency respects:
+
+1. if the unique left anchor ends and the unique right anchor begins on the same reference-forward oriented graph state, the left alignment must end at or before the right alignment begins on that state; otherwise G5 fails as coordinate-order incompatible;
+2. a primary-validation G5 pass is recorded as `PENDING_LATER_GATES`, since final primary-validation eligibility still depends on G6-G9.
+
+These safeguards do not alter the frozen 250-nt anchor length, >=95% query coverage threshold, >=98% identity threshold, minimap2 2.31 `asm5` preset, graph-walk construction, or physical-localization uniqueness rule. VAL0003 G5 remained uninspected when the implementation and regression tests were updated.
+
 ## Outcome masking state at this freeze
 
 - BGCPhaser score inspected: `NO`
@@ -73,4 +130,4 @@ Download executable recorded by the provenance manifest: `/usr/bin/curl`, curl `
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
 
-The next permitted operation is frozen G4 preprocessing and SPAdes assembly using fastp 1.3.6 and SPAdes 4.3.0. No system-specific tuning, subsampling, reference guidance, trusted contigs, or alternative rescue assembly is permitted.
+The next permitted operations are regression testing of the hardened G5 implementation and acquisition/checksum validation of exact reference `CP000075.1`, followed by G5 only after both are complete.
