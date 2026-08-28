@@ -1,0 +1,86 @@
+# VAL0008 prospective validation selection record
+
+Status: G3 passed; raw paired-end reads not yet downloaded
+
+Date frozen: 2026-08-28
+
+## Benchmark identity
+
+- Benchmark ID: `VAL0008`
+- MIBiG accession: `BGC0001479`
+- Organism: *Nostoc punctiforme* PCC 73102
+- NCBI Taxonomy ID: `63737`
+- Biosynthetic class: `NRP`
+- Reference accession: `CP001037.1`
+- Assembly accession: `GCA_000020025.1`
+
+## Frozen MIBiG-derived locus metadata
+
+- start coordinate: `3052001`
+- end coordinate: `3081156`
+- locus span: `29155 bp`
+- locus completeness: `complete`
+- total module count: `6`
+
+The locus and candidate ordering were frozen before read download, assembly, G5 localization, candidate enumeration, or BGCPhaser scoring.
+
+## Prospective run selection
+
+- selected run: `SRR30545090`
+- BioSample/sample accession: `SAMN43372961`
+- secondary sample accession: `SRS22462789`
+- BioProject/study accession: `PRJNA1152567`
+- experiment accession: `SRX25968490`
+- scientific name: *Nostoc punctiforme* PCC 73102
+- sample title: `N. punctiforme cells, Dark24, bio rep 1`
+- experiment title: `NextSeq 500 sequencing: WGS of Nostoc punctiforme Dark24`
+- library strategy: `WGS`
+- library source: `GENOMIC`
+- library selection: `PCR`
+- explicitly expected library selection: `PCR`
+- library layout: `PAIRED`
+- platform: `ILLUMINA`
+- instrument: `NextSeq 500`
+- read count: `97604601`
+- base count: `30157965721`
+- provenance status: `NO_DERIVATIVE_KEYWORD_DETECTED`
+- provenance flag: empty
+
+Selection basis: `EXACT_STRAIN_NAME_AND_TAXID;COMPLETE_REFERENCE_SAME_PCC_STRAIN;PLASMID_FOCUSED_RUNS_EXCLUDED;WHOLE_GENOME_PAIRED_ILLUMINA_RUN_SELECTED;PCR_LIBRARY_SELECTION_EXPLICITLY_PREDECLARED`.
+
+The six alternative PRJNA1034103 rows (`SRR26619834` through `SRR26619839`) were excluded prospectively because their sample/experiment metadata describe plasmid-focused sequence from desiccated *N. punctiforme* material. `SRR30545090` was selected before any downstream outcome was inspected because its experiment is explicitly whole-genome sequencing of PCC 73102. `library_selection=PCR` was prospectively accepted as an exact metadata value for this WGSeq run; it is not being reinterpreted as RANDOM.
+
+## Lock implementation provenance
+
+The first lock attempt failed before creating any lock output because `benchmarking/scripts/12_lock_validation_run.py` had historically hard-coded `library_selection=RANDOM`. This was an implementation constraint stricter than the frozen G3 protocol, which requires paired-end Illumina WGS and excludes amplicon/targeted-enrichment datasets but does not require the literal ENA value RANDOM.
+
+Before rerunning the lock, the helper was changed narrowly so that `--expected-library-selection` is explicit and defaults to `RANDOM`, preserving all prior lock behavior. The change was committed before the successful VAL0008 lock:
+
+- helper-change commit: `861c0e724ba1a79bc0775c28ee7bfb171f86b3fb`
+- helper blob/content SHA after change: `05212e43a93eebae78c28a8aa960fdbde70a05de`
+
+No biological eligibility criterion, score, threshold, reference, or downstream gate was modified.
+
+## Frozen lock hashes
+
+- prospective candidate table SHA-256: `35c35dad712f8833f50c2a476417fd2a24288c26b3f151718d85eae282d63c81`
+- locked one-row ENA manifest SHA-256: `dd92e4a2b34a47086e24f4c6c2cbcaaeccae27cc733b11eae808f13990c18422`
+- lock status: `PASS`
+
+## Predeclared FASTQ files
+
+- `SRR30545090_1.fastq.gz`: ENA MD5 `49a2910a3bb97e10ea0bee14193559e4`; expected `9279646920` bytes
+- `SRR30545090_2.fastq.gz`: ENA MD5 `c98d509a8e667b44e55c40270671ee95`; expected `9610960013` bytes
+- total expected compressed download: `18890606933` bytes
+
+This is approximately 18.9 GB decimal (about 17.6 GiB), substantially larger than VAL0005. Sufficient free disk space must be available not only for the raw FASTQs but also for processed FASTQs and SPAdes intermediates before G4 is started.
+
+## Outcome masking state at this freeze
+
+- BGCPhaser score inspected: `NO`
+- truth rank inspected: `NO`
+- chemistry outcome inspected: `NO`
+- reference-similarity outcome inspected: `NO`
+- G5 endpoint localization inspected: `NO`
+
+The next permitted operation is exact paired FASTQ download under the frozen resumable ENA downloader with byte-count and MD5 verification. No alternate run, read subset, reference substitution, or downstream-outcome-driven change is permitted.
