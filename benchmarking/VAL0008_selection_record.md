@@ -1,8 +1,9 @@
 # VAL0008 prospective validation selection record
 
-Status: G3 passed; raw paired-end reads not yet downloaded
+Status: G3 passed; raw paired-end reads downloaded and integrity-verified; G4 not yet run
 
-Date frozen: 2026-08-28
+Selection frozen: 2026-08-28
+Raw-read verification completed: 2026-08-30
 
 ## Benchmark identity
 
@@ -67,20 +68,50 @@ No biological eligibility criterion, score, threshold, reference, or downstream 
 - locked one-row ENA manifest SHA-256: `dd92e4a2b34a47086e24f4c6c2cbcaaeccae27cc733b11eae808f13990c18422`
 - lock status: `PASS`
 
-## Predeclared FASTQ files
+## Verified raw FASTQ provenance
 
-- `SRR30545090_1.fastq.gz`: ENA MD5 `49a2910a3bb97e10ea0bee14193559e4`; expected `9279646920` bytes
-- `SRR30545090_2.fastq.gz`: ENA MD5 `c98d509a8e667b44e55c40270671ee95`; expected `9610960013` bytes
-- total expected compressed download: `18890606933` bytes
+The exact locked ENA FASTQs were acquired with downloader protocol `1.3-resumable-curl` using `/usr/bin/curl` 8.7.1. Transfers were interrupted repeatedly and resumed without deleting the retained partial files. Finalization occurred only after exact expected byte count and ENA MD5 verification.
 
-This is approximately 18.9 GB decimal (about 17.6 GiB), substantially larger than VAL0005. Sufficient free disk space must be available not only for the raw FASTQs but also for processed FASTQs and SPAdes intermediates before G4 is started.
+### Mate 1
 
-## Outcome masking state at this freeze
+- file: `SRR30545090_1.fastq.gz`
+- expected bytes: `9279646920`
+- observed bytes: `9279646920`
+- ENA MD5: `49a2910a3bb97e10ea0bee14193559e4`
+- observed MD5: `49a2910a3bb97e10ea0bee14193559e4`
+- SHA-256: `8ee45de3830e9b1161783d53a8ea0c83c6d774fdfd60c57b9458b67c8e32dc99`
+- final provenance transport field: `existing_verified`
+
+`existing_verified` records that the final successful downloader invocation found the already-completed mate-1 file and reverified it before processing mate 2; it does not imply an unverified pre-existing input.
+
+### Mate 2
+
+- file: `SRR30545090_2.fastq.gz`
+- expected bytes: `9610960013`
+- observed bytes: `9610960013`
+- ENA MD5: `c98d509a8e667b44e55c40270671ee95`
+- observed MD5: `c98d509a8e667b44e55c40270671ee95`
+- SHA-256: `39ae61f47cfbb22aae91e091d68ee5a4b7e93b7c060781a56453d4958f451f02`
+- final transport: `curl_ftp_resumable`
+
+### Download-audit preservation
+
+The terminal verification showed the final mate-2 FTP attempt reaching the exact expected byte count with curl exit code 0 and result `VERIFIED`. The raw directory contains:
+
+- `download_diagnostics.tsv`
+- `download_diagnostics_pre_resume.tsv`
+- `download_diagnostics_pre_resume_2.tsv`
+- `download_diagnostics_pre_resume_3.tsv`
+
+No `*.part` files remained after verification. Thus the complete compressed raw input set is exactly `18890606933` bytes and both raw FASTQs are integrity-verified before G4.
+
+## Outcome masking state after raw-read verification
 
 - BGCPhaser score inspected: `NO`
 - truth rank inspected: `NO`
 - chemistry outcome inspected: `NO`
 - reference-similarity outcome inspected: `NO`
 - G5 endpoint localization inspected: `NO`
+- G4 assembly outcome inspected: `NO`
 
-The next permitted operation is exact paired FASTQ download under the frozen resumable ENA downloader with byte-count and MD5 verification. No alternate run, read subset, reference substitution, or downstream-outcome-driven change is permitted.
+The next permitted operation is the frozen G4 fastp/SPAdes workflow. No alternate run, read subset, reference substitution, preprocessing change, or downstream-outcome-driven modification is permitted.
